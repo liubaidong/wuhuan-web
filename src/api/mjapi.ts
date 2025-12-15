@@ -17,7 +17,7 @@ export interface gptsType{
 }
 
 export function upImg(file: any): Promise<any> {
-    const maxSize = homeStore.myData.session.uploadImgSize ? (+homeStore.myData.session.uploadImgSize) : 1
+    const maxSize = homeStore.myData.session.uploadImgSize ? (+homeStore.myData.session.uploadImgSize) : 100
     return new Promise((resolve, reject) => {
         const filename = file.name;
         if (file.size > (1024 * 1024 * maxSize)) {
@@ -174,7 +174,7 @@ export const mjFetch=(url:string,data?:any)=>{
     header= {...header,...getHeaderApiSecret() }
 
     return new Promise<any>((resolve, reject) => {
-        let opt:RequestInit ={method:'GET'}; 
+        let opt:RequestInit ={method:'GET'};
         opt.headers=header;
         if(data) {
             opt.body= JSON.stringify(data) ;
@@ -189,7 +189,7 @@ export const mjFetch=(url:string,data?:any)=>{
             }).catch(e=>reject({error:e? e.toString() :'json_error',code:'json_error',url:getUrl(url) , status:d2.status  }))
         ).catch(e=>reject({error:e? e.toString() :'fetch fail',data ,code:'fetch_fail',url:getUrl(url)  }))
     })
-     
+
 }
 
 export const myFetch=(url:string,data?:any)=>{
@@ -198,7 +198,7 @@ export const myFetch=(url:string,data?:any)=>{
     //header= {...header  }
 
     return new Promise<any>((resolve, reject) => {
-        let opt:RequestInit ={method:'GET'}; 
+        let opt:RequestInit ={method:'GET'};
         opt.headers=header;
         if(data) {
             opt.body= JSON.stringify(data) ;
@@ -209,7 +209,7 @@ export const myFetch=(url:string,data?:any)=>{
         .catch(e=>reject(e)))
         .catch(e=>reject(e))
     })
-     
+
 }
 export const my2Fetch=(url:string,data?:any)=>{
     mlog('mjFetch', url  );
@@ -217,7 +217,7 @@ export const my2Fetch=(url:string,data?:any)=>{
     //header= {...header  }
 
     return new Promise<any>((resolve, reject) => {
-        let opt:RequestInit ={method:'GET'}; 
+        let opt:RequestInit ={method:'GET'};
         opt.headers=header;
         if(data) {
             opt.body= JSON.stringify(data) ;
@@ -391,7 +391,7 @@ export const isCanBase64Model=(model:string)=>{
     }
     //if(model.indexOf('sonnet')>-1 ) return true ;
     let visionArr=['gemini-pro-vision','gpt-4o-2024-08-06','gpt-4o-2024-11-20','gpt-4o','gpt-4o-2024-05-13','gpt-4o-mini','gpt-4o-mini-2024-07-18','gemini-pro-1.5','gpt-4-turbo','gpt-4-turbo-2024-04-09','gpt-4-vision-preview','luma-video','claude-3-5-sonnet-20240620' ,'claude-3-sonnet-20240229','claude-3-opus-20240229', defaultVisionModel() ]
-    if( homeStore.myData.session.customVisionModel ){ 
+    if( homeStore.myData.session.customVisionModel ){
         homeStore.myData.session.customVisionModel.split(/[ ,]+/ig).map( (v:string)=>{
             visionArr.push( v.toLocaleLowerCase() )
         });

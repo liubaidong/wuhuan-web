@@ -216,6 +216,17 @@ watch(()=>homeStore.myData.act,(n)=>{
             dchat.dateTime= new Date().toLocaleString();
             updateChat( +dchat.uuid, +dchat.index, dchat );
             mlog('updateChat 动作更新',dchat.model , dchat.opt?.progress, dchat.opt?.imageUrl  );
+            // 如果已有图片返回，但文本仍是“失败！”之类错误提示，则改为成功提示
+            if (dchat.opt?.imageUrl && typeof dchat.text === 'string' && dchat.text.startsWith('失败！')) {
+              updateChatSome(
+                +dchat.uuid,
+                +dchat.index,
+                {
+                  text: t('mjchat.success') || '图片生成成功',
+                  error: false,
+                },
+              )
+            }
             if( dchat.opt?.progress&& dchat.opt?.progress=='100%' && dchat.opt?.imageUrl ){
                // url2base64(dchat.opt?.imageUrl ,'img:'+dchat.mjID ).then(()=>{}).catch((e)=>mlog('url2base64 error',e));
                //homeStore.setMyData{{act}}

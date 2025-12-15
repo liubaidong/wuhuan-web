@@ -1,4 +1,3 @@
-
 import { gptConfigStore, gptServerStore, homeStore,useAuthStore } from "@/store";
 import { mlog,myTrim } from "./mjapi";
 import { fetchSSE } from "./sse/fetchsse";
@@ -279,7 +278,7 @@ export const subModel= async (opt: subModelType)=>{
                  if(data=='[DONE]') opt.onMessage({text:'',isFinish:true})
                  else {
                     try{
-                        // TODO 思考处理，DeepSeek  API 字段reasoning_content ，本地部署标签<think> 
+                        // TODO 思考处理，DeepSeek  API 字段reasoning_content ，本地部署标签<think>
                         const obj= JSON.parse(data );
                         // 若是错误 JSON（如 code/reason/message），走错误回调，不拼接为文本
                         const hasErrorShape = obj && (obj.error || obj.code || obj.reason || obj.message)

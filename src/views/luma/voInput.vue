@@ -40,8 +40,12 @@ const generate= async ()=>{
 function selectFile(input:any){
      
     upImg(input.target.files[0]).then(d=>{
-        luma.value.image_url= d;
-        fsRef.value=''
+        // upImg 返回 { url, fileName, ossId }，这里只需要预览用的 url
+        luma.value.image_url = d?.url ?? '';
+        // 重置文件选择框，避免同一文件无法再次触发 change
+        if (fsRef.value) {
+            fsRef.value.value = '';
+        }
     }).catch(e=>ms.error(e));
     
 }

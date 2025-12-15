@@ -53,6 +53,28 @@ const { uuid } = route.params as { uuid: string }
 
 const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
 
+// 根据当前页面类型（对话 / 绘画）拆分展示数据，避免混淆
+// Chat 页面：只展示普通对话消息（排除 Midjourney / DALL·E 等绘图消息）
+// Draw 页面：只展示绘图相关消息
+const local = computed(() => homeStore.myData.local)
+
+const displayMessages = computed(() => {
+  const list = dataSources.value || []
+  // 判定是否为绘图消息
+  const isDrawMsg = (item: Chat.Chat) => {
+    const model = item.model || ''
+    return !!item.mjID
+      || model === 'midjourney'
+      || model.includes('dall-e')
+  }
+
+  if (local.value === 'draw')
+    return list.filter(isDrawMsg)
+
+  // 对话页面：过滤掉所有绘图消息
+  return list.filter(item => !isDrawMsg(item))
+})
+
 const prompt = ref<string>("")
 const loading = ref<boolean>(false)
 const inputRef = ref<Ref | null>(null)
@@ -98,12 +120,35 @@ async function loadHistoryBySession(sessionId: number) {
 
 onMounted(() => {
   const sid = Number(uuid)
-  if (!Number.isNaN(sid) && sid > 0) loadHistoryBySession(sid)
+  if (!Number.isNaN(sid) && sid > 0)
+    loadHistoryBySession(sid)
 })
 
+// 监听路由参数变化
 watch(() => route.params?.uuid, (n) => {
   const sid = Number(n)
-  if (!Number.isNaN(sid) && sid > 0) loadHistoryBySession(sid)
+  if (!Number.isNaN(sid) && sid > 0)
+    loadHistoryBySession(sid)
+})
+
+// 监听路由名称变化，确保从绘图页面切换到对话页面时重新加载历史记录
+watch(() => route.name, (newName, oldName) => {
+  // 当从绘图页面切换到对话页面时，重新加载历史记录
+  if ((oldName === 'draw' && newName === 'Chat') || (oldName === 'Rootdraw' && newName === 'Chat')) {
+    const sid = Number(route.params?.uuid)
+    if (!Number.isNaN(sid) && sid > 0)
+      loadHistoryBySession(sid)
+  }
+})
+
+// 监听路由路径变化，作为额外保障
+watch(() => route.path, (newPath, oldPath) => {
+  // 当从 /draw 路径切换到 /chat 路径时，重新加载历史记录
+  if (oldPath && oldPath.startsWith('/draw/') && newPath.startsWith('/chat/')) {
+    const sid = Number(route.params?.uuid)
+    if (!Number.isNaN(sid) && sid > 0)
+      loadHistoryBySession(sid)
+  }
 })
 
 function handleSubmit() {
@@ -364,7 +409,7 @@ onUnmounted(() => {
   homeStore.setMyData({ isLoader: false })
 })
 
-const local = computed(() => homeStore.myData.local)
+// const local 已在前面定义，这里仅保持使用
 watch(
   () => homeStore.myData.act,
   (n) => {
@@ -408,7 +453,7 @@ const ychat = computed(() => {
 
         <div id="image-wrapper" class="w-full max-w-[1100px] m-auto dark:bg-[#101014]"
           :class="[isMobile ? 'p-2' : 'p-4']">
-          <template v-if="!dataSources.length">
+          <template v-if="!displayMessages.length">
             <div v-if="homeStore.myData.session.notify" v-html="homeStore.myData.session.notify"
               class="text-neutral-300 mt-4">
 
@@ -435,17 +480,75 @@ const ychat = computed(() => {
                 </div>
               </div>
             </div>
-
           </template>
 
           <template v-else>
-            <div>
-              <Message v-for="(item, index) of dataSources" :key="index" :date-time="item.dateTime" :text="item.text"
-                :inversion="item.inversion" :error="item.error" :loading="item.loading"
-                @regenerate="onRegenerate(index)" @delete="handleDelete(index)" :chat="item" :index="index" />
-              <Message v-if="ychat.text && !homeStore.myData.session.isCloseMdPreview" :key="dataSources.length"
-                :inversion="true" :date-time="$t('mj.typing')" :chat="ychat" :text="ychat.text"
-                :index="dataSources.length" />
+            <!-- 桌面端：左侧对话列表 + 右侧输入提示词预览气泡 -->
+            <div v-if="!isMobile" class="flex items-start gap-4">
+              <div class="flex-1 min-w-0">
+                <Message
+                  v-for="(item, index) of displayMessages"
+                  :key="index"
+                  :date-time="item.dateTime"
+                  :text="item.text"
+                  :inversion="item.inversion"
+                  :error="item.error"
+                  :loading="item.loading"
+                  @regenerate="onRegenerate(index)"
+                  @delete="handleDelete(index)"
+                  :chat="item"
+                  :index="index"
+                />
+                <div class="sticky bottom-0 left-0 flex justify-center">
+                  <NButton v-if="loading" type="warning" @click="handleStop">
+                    <template #icon>
+                      <SvgIcon icon="ri:stop-circle-line" />
+                    </template>
+                    {{ t('common.stopResponding') }}
+                  </NButton>
+                </div>
+              </div>
+              <!-- 右侧预览列：将当前输入的提示词以对话气泡形式展示 -->
+              <div
+                v-if="ychat.text && !homeStore.myData.session.isCloseMdPreview && local !== 'draw'"
+                class="w-[260px] shrink-0"
+              >
+                <Message
+                  :key="displayMessages.length"
+                  :inversion="true"
+                  :date-time="$t('mj.typing')"
+                  :chat="ychat"
+                  :text="ychat.text"
+                  :index="displayMessages.length"
+                />
+              </div>
+            </div>
+
+            <!-- 移动端：保持原有单列布局 -->
+            <div v-else>
+              <Message
+                v-for="(item, index) of displayMessages"
+                :key="index"
+                :date-time="item.dateTime"
+                :text="item.text"
+                :inversion="item.inversion"
+                :error="item.error"
+                :loading="item.loading"
+                @regenerate="onRegenerate(index)"
+                @delete="handleDelete(index)"
+                :chat="item"
+                :index="index"
+              />
+              <!-- 只在对话页面展示输入预览，绘图页面不需要 -->
+              <Message
+                v-if="ychat.text && !homeStore.myData.session.isCloseMdPreview && local !== 'draw'"
+                :key="displayMessages.length"
+                :inversion="true"
+                :date-time="$t('mj.typing')"
+                :chat="ychat"
+                :text="ychat.text"
+                :index="displayMessages.length"
+              />
               <div class="sticky bottom-0 left-0 flex justify-center">
                 <NButton v-if="loading" type="warning" @click="handleStop">
                   <template #icon>

@@ -35,6 +35,19 @@
 		&-wrapper {
 			position: relative;
 			padding-top: 24px;
+			max-height: 480px;
+			overflow: auto;
+			transition: max-height 0.2s ease;
+
+			&--collapsed {
+				max-height: 480px;
+				overflow: auto;
+			}
+
+			&:not(&--collapsed) {
+				max-height: none;
+				overflow: visible;
+			}
 		}
 
 		&-header {
@@ -47,6 +60,18 @@
 			justify-content: flex-end;
 			align-items: center;
 			color: #b3b3b3;
+
+			&__toggle {
+				margin-right: auto;
+				cursor: pointer;
+				user-select: none;
+				font-size: 12px;
+				opacity: 0.8;
+
+				&:hover {
+					opacity: 1;
+				}
+			}
 
 			&__copy {
 				cursor: pointer;
@@ -88,6 +113,69 @@
 		to {
 			visibility: hidden;
 		}
+	}
+}
+
+/* 助手回复气泡：浅灰背景 + 小尾巴，保证文字清晰可读 */
+.message-reply {
+	position: relative;
+	background-color: #f3f4f6;
+	color: #111827;
+	padding: 10px 12px;
+	border-radius: 14px;
+
+	.whitespace-pre-wrap {
+		background-color: transparent;
+		color: inherit;
+		padding: 0;
+		border-radius: 0;
+		line-height: 1.6;
+		white-space: pre-wrap;
+	}
+
+	// 助手回复正文字体渐变紫（包括 “失败！” 等提示）
+	.markdown-body {
+		p {
+			background-image: linear-gradient(90deg, rgba(168, 85, 247, 1) 26%, rgba(236, 72, 153, 1) 51%);
+			-webkit-background-clip: text;
+			background-clip: text;
+			color: transparent;
+			text-align: left;
+			vertical-align: middle;
+			background-color: rgba(214, 199, 199, 1);
+			border-width: 1px;
+			border-color: rgba(0, 0, 0, 1);
+		}
+	}
+
+	&::after {
+		content: '';
+		position: absolute;
+		left: -6px;
+		bottom: 10px;
+		width: 12px;
+		height: 12px;
+		background: inherit;
+		border-radius: 4px;
+		transform: rotate(45deg);
+		box-shadow: -2px 2px 4px rgba(15, 23, 42, 0.45);
+	}
+}
+
+.message-request {
+	position: relative;
+
+	&::after {
+		content: '';
+		position: absolute;
+		right: -6px;
+		bottom: 10px;
+		width: 12px;
+		height: 12px;
+		background: inherit;
+		border-radius: 4px;
+		transform: rotate(45deg);
+		box-shadow: 2px 2px 6px rgba(34, 197, 94, 0.55);
 	}
 }
 
