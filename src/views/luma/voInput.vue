@@ -38,16 +38,36 @@ const generate= async ()=>{
 }
 
 function selectFile(input:any){
+    const file = input.target.files[0];
+    if (!file) return;
+    
+    mlog('selectFile - file selected:', file.name, file.size);
      
-    upImg(input.target.files[0]).then(d=>{
+    upImg(file).then(d=>{
+        mlog('upImg response:', d);
         // upImg 返回 { url, fileName, ossId }，这里只需要预览用的 url
-        luma.value.image_url = d?.url ?? '';
+        if (d && d.url) {
+            luma.value.image_url = d.url;
+            mlog('image_url set to:', luma.value.image_url);
+            ms.success(t('video.uploadSuccess') || '图片上传成功');
+        } else {
+            mlog('upImg response missing url:', d);
+            ms.error(t('video.uploadError') || '图片上传失败：未返回URL');
+        }
         // 重置文件选择框，避免同一文件无法再次触发 change
         if (fsRef.value) {
             fsRef.value.value = '';
         }
-    }).catch(e=>ms.error(e));
-    
+    }).catch(e=>{
+        mlog('upload error:', e);
+        ms.error(e?.message || e || t('video.uploadError') || '图片上传失败');
+    });
+}
+
+function handleImageError(event:any){
+    mlog('Image load error:', event);
+    ms.error(t('video.imageLoadError') || '图片加载失败');
+    luma.value.image_url = '';
 }
 
 const clearInput = ()=>{
@@ -58,7 +78,7 @@ const clearInput = ()=>{
 </script>
 
 <template>
-<div class="p-2"> 
+<div class="p-2 flex flex-col justify-start max-w-[300px] h-[253px]">
     <div>
       <n-input v-model:value="luma.user_prompt" 
                 :placeholder="$t('video.descpls')"  type="textarea"  size="small"   
@@ -70,8 +90,14 @@ const clearInput = ()=>{
             <div> 
                 <input type="file"  @change="selectFile"  ref="fsRef" style="display: none" accept="image/jpeg, image/jpg, image/png, image/gif"/>
                 <div class="h-[80px] w-[80px] overflow-hidden rounded-sm border border-gray-400/20 flex justify-center items-center cursor-pointer upload-video" @click=" fsRef.click()">
-                    <img :src="luma.image_url" v-if="luma.image_url" />
-                    <div class="text-center" v-else>{{ $t('video.selectimg') }}</div> 
+                    <img 
+                        v-if="luma.image_url" 
+                        :src="luma.image_url" 
+                        class="w-full h-full object-cover"
+                        @error="handleImageError"
+                        alt="Uploaded image"
+                    />
+                    <div class="text-center text-xs text-gray-500 px-2" v-else>{{ $t('video.selectimg') }}</div> 
                 </div>
             </div>
             <div class="pb-1 text-right">

@@ -154,19 +154,34 @@ function createPrompt(rz:string){
 }
 
 function selectFile(input:any){
+    const file = input.target.files[0];
+    if (!file) return;
+    
     if(st.value.fileBase64.length>=5 ) {
         ms.error( t('mjchat.more5sb'));
         return;
     }
-    upImg(input.target.files[0]).then( (d:any )=>{
-        const index = st.value.fileBase64.findIndex(v=>v==d);
+    upImg(file).then( (d:any )=>{
+        mlog('selectFile upImg response:', d);
+        // upImg 返回 { url, fileName, ossId }，这里只需要 URL
+        if (!d || !d.url) {
+            msgRef.value.showError(t('mjchat.uploadError') || '图片上传失败：未返回URL');
+            return;
+        }
+        const imageUrl = d.url;
+        const index = st.value.fileBase64.findIndex(v=>v==imageUrl);
         if(index>-1) {
             ms.error( t('mjchat.no2add'));
             return ;
         }
-        st.value.fileBase64.push(d);
+        st.value.fileBase64.push(imageUrl);
+        mlog('fileBase64 after push:', st.value.fileBase64);
         fsRef.value.value='';
-    }).catch(e=>msgRef.value.showError(e));
+        ms.success(t('mjchat.uploadSuccess') || '图片上传成功');
+    }).catch(e=>{
+        mlog('selectFile upload error:', e);
+        msgRef.value.showError(e);
+    });
 
 }
 
@@ -252,14 +267,25 @@ const uploader=(type:string)=>{
     st.value.upType= type;
     fsRef3.value.click();
 }
+function handleImageError(event:any){
+    mlog('Image load error:', event);
+    ms.error(t('mjchat.imageLoadError') || '图片加载失败');
+}
+
 const selectFile3=  (input:any)=>{
+    const file = input.target.files[0];
+    if (!file) return;
+    
     // ms.loading('上传中...');
-    upImg(input.target.files[0]).then( async(d)=>{
+    upImg(file).then( async(d)=>{
         mlog('selectFile3>> ',d );
+        // upImg 返回 { url, fileName, ossId }，但这里需要 base64
+        // 注意：这里可能需要根据实际需求调整，如果后端需要 URL 而不是 base64
+        const imageUrl = d?.url || d;
         let data={
             action:'img2txt',
             data:{
-                "base64Array":d
+                "base64Array":imageUrl
             }
         }
         const blob = base64ToBlob(data.data.base64Array);
@@ -398,9 +424,14 @@ function blobToFile(blob: Blob, fileName: string): File {
                 <p v-html="$t('mjchat.imgCInfo')"></p>
 
                 3.<a class="text-green-500 cursor-pointer"  @click="fsRef.click()" v-html="$t('mjchat.imgCadd')"></a><br/>
-                <div  v-if="st.fileBase64.length>0" class="flex justify-start items-baseline">
-                    <div class="p-1" v-for="(v ) in st.fileBase64">
-                        <img  class="w-[60px]" :src="v">
+                <div  v-if="st.fileBase64.length>0" class="flex justify-start items-baseline flex-wrap gap-2 mt-2">
+                    <div class="p-1 border border-gray-200 rounded" v-for="(v, index) in st.fileBase64" :key="index">
+                        <img  
+                            class="w-[60px] h-[60px] object-cover rounded" 
+                            :src="v"
+                            @error="handleImageError"
+                            alt="Uploaded image"
+                        />
                         <br/>
                         <NButton size="small" @click="st.fileBase64= st.fileBase64.filter((item)=>item!=v) " type="warning" >{{$t('mjchat.del')}}</NButton>
                     </div>

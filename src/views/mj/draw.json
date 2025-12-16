@@ -106,73 +106,73 @@
 	"viewList": [
 		{
 			"labelKey": "draw.viewList.wideView",
-			"value": "Wide view"
+			"value": "宽视角"
 		},
 		{
 			"labelKey": "draw.viewList.birdView",
-			"value": "Aerial view"
+			"value": "鸟瞰视角"
 		},
 		{
 			"labelKey": "draw.viewList.topView",
-			"value": "Top view"
+			"value": "顶视角"
 		},
 		{
 			"labelKey": "draw.viewList.upview",
-			"value": "Upview"
+			"value": "仰视角"
 		},
 		{
 			"labelKey": "draw.viewList.frontView",
-			"value": "Front view"
+			"value": "正面视角"
 		},
 		{
 			"labelKey": "draw.viewList.headshot",
-			"value": "Headshot"
+			"value": "头部特写"
 		},
 		{
 			"labelKey": "draw.viewList.ultrawideshot",
-			"value": "Ultrawideshot"
+			"value": "超广角视角"
 		},
 		{
 			"labelKey": "draw.viewList.mediumShot",
-			"value": "Medium Shot(MS)"
+			"value": "中景"
 		},
 		{
 			"labelKey": "draw.viewList.longShot",
-			"value": "Long Shot(LS)"
+			"value": "远景"
 		},
 		{
 			"labelKey": "draw.viewList.depthOfField",
-			"value": "depth offield(dof)"
+			"value": "景深"
 		}
 	],
 	"shotList": [
 		{
 			"labelKey": "draw.shotList.faceShot",
-			"value": "Face Shot (VCU)"
+			"value": "脸部特写"
 		},
 		{
 			"labelKey": "draw.shotList.bigCloseUp",
-			"value": "Big Close-Up(BCU)"
+			"value": "大特写"
 		},
 		{
 			"labelKey": "draw.shotList.closeUp",
-			"value": "Close-Up(CU)"
+			"value": "特写"
 		},
 		{
 			"labelKey": "draw.shotList.waistShot",
-			"value": "Waist Shot(WS)"
+			"value": "腰部以上"
 		},
 		{
 			"labelKey": "draw.shotList.kneeShot",
-			"value": "KneeShot(KS)"
+			"value": "膝盖以上"
 		},
 		{
 			"labelKey": "draw.shotList.fullLengthShot",
-			"value": "Full Length Shot(FLS)"
+			"value": "全身照"
 		},
 		{
 			"labelKey": "draw.shotList.extraLongShot",
-			"value": "Extra Long Shot(ELS)"
+			"value": "极远景"
 		}
 	],
 	"stylesList": [
@@ -196,39 +196,39 @@
 	"lightList": [
 		{
 			"labelKey": "draw.lightList.coldLight",
-			"value": "Cold light"
+			"value": "冷光"
 		},
 		{
 			"labelKey": "draw.lightList.warmLight",
-			"value": "Warm light"
+			"value": "暖光"
 		},
 		{
 			"labelKey": "draw.lightList.hardLighting",
-			"value": "hard lighting"
+			"value": "硬光"
 		},
 		{
 			"labelKey": "draw.lightList.dramaticLight",
-			"value": "Dramatic light"
+			"value": "戏剧性光线"
 		},
 		{
 			"labelKey": "draw.lightList.reflectionLight",
-			"value": "reflection light"
+			"value": "反射光"
 		},
 		{
 			"labelKey": "draw.lightList.mistyFoggy",
-			"value": "Misty foggy"
+			"value": "薄雾"
 		},
 		{
 			"labelKey": "draw.lightList.naturalLight",
-			"value": "Natural light"
+			"value": "自然光"
 		},
 		{
 			"labelKey": "draw.lightList.sunLight",
-			"value": "Sun light"
+			"value": "阳光"
 		},
 		{
 			"labelKey": "draw.lightList.moody",
-			"value": "moody"
+			"value": "情绪化"
 		}
 	],
 	"versionList": [
