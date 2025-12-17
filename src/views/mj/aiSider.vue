@@ -7,6 +7,7 @@ import { removeToken } from '@/store/modules/auth/helper'
 import { NTooltip, NAvatar, NPopover, NMenu, NIcon } from 'naive-ui'
 
 import { loginOut, getUserInfo } from '@/api/user'
+import defaultAvatar from '@/assets/avatar.jpg'
 
 import { defaultSetting, UserInfo } from '@/store/modules/user/helper'
 import { useRouter } from 'vue-router'
@@ -17,14 +18,15 @@ import {
   Storefront as storefront,
   LogOut as out
 } from '@vicons/ionicons5'
-import { useChatStore } from '@/store'
+import { useChatStore, useUserStore } from '@/store'
 
 
 const Setting = defineAsyncComponent(() => import('@/components/common/Setting/index.vue'))
 
 const st = ref({ 'show': false, showImg: false, menu: [], active: 'chat' })
 const router1 = useRouter()
-const userInfo = ref<UserInfo>(defaultSetting().userInfo)
+const userStore = useUserStore()
+const userInfo = computed(() => userStore.userInfo)
 
 const show = ref(false)
 const urouter = useRouter() //
@@ -74,12 +76,13 @@ async function getLoginUserInfo() {
     console.log(err.toString())
   }
   if (newUserInfo) {
-    if (newUserInfo.data.user.avatar)
-      userInfo.value.avatar = newUserInfo.data.user.avatar;
-    userInfo.value.name = newUserInfo.data.user.nickName;
-    userInfo.value.userBalance = newUserInfo.data.user.userBalance;
-    userInfo.value.userName = newUserInfo.data.user.userName;
-    isLogin.value = true
+    // 更新 userStore 中的用户信息
+    userStore.updateUserInfo({
+      avatar: newUserInfo.data.user.avatar || userInfo.value.avatar,
+      name: newUserInfo.data.user.nickName,
+      userBalance: newUserInfo.data.user.userBalance,
+      userName: newUserInfo.data.user.userName
+    })
   }
 }
 
@@ -220,6 +223,7 @@ const handleSelect = (key: string) => {
               size="large"
               round
               :src="userInfo.avatar"
+              :fallback-src="defaultAvatar"
               class="ai-sider-avatar"
             />
           </template>
