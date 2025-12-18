@@ -46,9 +46,9 @@ const goToClassic = () => {
             </template>
             创建奇迹模式
           </NButton>
-        </div>
+    </div>
         <chatIndex />
-      </main>
+    </main>
     </template>
 
     <!-- 创建奇迹模式 -->
@@ -63,5 +63,5 @@ const goToClassic = () => {
       </div>
       <createMiracles />
     </template>
-  </div>
+</div>
 </template>

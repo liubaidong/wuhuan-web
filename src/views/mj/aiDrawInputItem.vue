@@ -15,6 +15,7 @@ import {t} from "@/locales"
 import axios from "@/utils/request/axios";
 //import { upImg } from "./mj";
 import { getToken } from '@/store/modules/auth/helper'
+import { imageModelList } from '@/api/model'
 
 const vf=[{s:'width: 100%; height: 100%;',label:'1:1'}
 ,{s:'width: 100%; height: 75%;',label:'4:3'}
@@ -27,6 +28,8 @@ const f=ref({bili:-1, quality:'',view:'',light:'',shot:'',style:'', styles:'',ve
 const st =ref({text:'',isDisabled:false,isLoad:false
     ,fileBase64:[],bot:'',showFace:false,upType:''
 });
+// 从后端获取的模型列表
+const imageModelListData = ref<any[]>([])
 const farr= [
 { k:'style',v:t('mjchat.tStyle') }
 ,{ k:'view',v: t('mjchat.tView') }
@@ -40,14 +43,22 @@ const farr= [
 const drawlocalized = computed(() => {
 	let localizedConfig = {};
 	Object.keys(config).forEach((key) => {
-		localizedConfig[key] = config[key].map((option: { labelKey: any; }) => {
-			// 假设 labelKey 如 "draw.qualityList.general"
-			let path = option.labelKey; // 直接使用 labelKey 作为路径
-			return {
-				...option,
-				label: t(path), // 从 i18n 中获取本地化的标签
-			};
-		});
+		// 如果是 versionList，使用从后端获取的数据
+		if (key === 'versionList' && imageModelListData.value.length > 0) {
+			localizedConfig[key] = imageModelListData.value.map((model: any) => ({
+				label: model.modelDescribe || model.modelName || model.label || '',
+				value: model.modelName || model.value || '',
+			}));
+		} else {
+			localizedConfig[key] = config[key].map((option: { labelKey: any; }) => {
+				// 假设 labelKey 如 "draw.qualityList.general"
+				let path = option.labelKey; // 直接使用 labelKey 作为路径
+				return {
+					...option,
+					label: t(path), // 从 i18n 中获取本地化的标签
+				};
+			});
+		}
 	});
 	return localizedConfig;
 });
@@ -214,8 +225,19 @@ watch(()=>homeStore.myData.act,(n)=>{
    // n=='copy' && copy2();
     n=='same2' && same2();
 });
-onMounted(()=>{
+onMounted(async ()=>{
     homeStore.myData.act=='same2' && same2();
+    // 从后端获取模型列表
+    try {
+        const result = await imageModelList();
+        if (result && result.data) {
+            imageModelListData.value = result.data;
+            mlog('imageModelList loaded:', imageModelListData.value);
+        }
+    } catch (error) {
+        mlog('Failed to load imageModelList:', error);
+        ms.error('获取模型列表失败');
+    }
 });
 
 

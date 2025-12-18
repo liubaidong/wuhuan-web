@@ -6,6 +6,7 @@ import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { t } from '@/locales'
 import { upImg, mjFetch, mlog } from '@/api'
 import { homeStore, useChatStore } from '@/store'
+import { imageModelList } from '@/api/model'
 
 const { isMobile } = useBasicLayout()
 const message = useMessage()
@@ -17,6 +18,8 @@ const loading = ref(false)
 const selectedAspectRatio = ref('16:9')
 const selectedStyle = ref('')
 const selectedQuality = ref('')
+const selectedModel = ref('')
+const modelOptions = ref<any[]>([])
 const uploadedImages = ref<string[]>([])
 const generatedImages = ref<any[]>([])
 const showImageModal = ref(false)
@@ -26,7 +29,7 @@ const selectedImage = ref('')
 const loadGeneratedImages = () => {
   const chats = chatStore.getChatByUuid(chatStore.active)
   const images: any[] = []
-  
+
   chats.forEach((chat: Chat.Chat) => {
     if (!chat.inversion && chat.opt?.imageUrl) {
       images.push({
@@ -38,7 +41,7 @@ const loadGeneratedImages = () => {
       })
     }
   })
-  
+
   generatedImages.value = images.reverse() // 最新的在前
 }
 
@@ -139,7 +142,7 @@ const generateImage = async () => {
 
     // 调用后端API - 使用现有的 imagine 接口
     const response = await mjFetch('/mj/submit/imagine', params)
-    
+
     if (response && response.result) {
       // 将任务添加到生成列表，等待结果
       generatedImages.value.unshift({
@@ -151,14 +154,14 @@ const generateImage = async () => {
         loading: true,
       })
       message.success('图片生成任务已提交，请稍候...')
-      
+
       // 使用现有的任务处理机制
-      homeStore.setMyData({ 
-        act: 'draw', 
-        actData: { 
+      homeStore.setMyData({
+        act: 'draw',
+        actData: {
           taskId: response.result,
           prompt: prompt.value,
-        } 
+        }
       })
     } else if (response?.code === 21) {
       // 需要模态确认
@@ -227,9 +230,27 @@ const downloadImage = async (imageUrl: string) => {
   }
 }
 
-// 组件挂载时加载图片
+// 获取模型列表
+const fetchModelList = async () => {
+  try {
+    const result = await imageModelList()
+    if (result && result.data) {
+      modelOptions.value = result.data.map((model: any) => ({
+        label: model.modelDescribe || model.modelName || '',
+        value: model.modelName || '',
+      }))
+      mlog('Model list loaded:', modelOptions.value)
+    }
+  } catch (error) {
+    mlog('Failed to load model list:', error)
+    message.error('获取模型列表失败')
+  }
+}
+
+// 组件挂载时加载图片和模型列表
 onMounted(() => {
   loadGeneratedImages()
+  fetchModelList()
 })
 </script>
 
@@ -289,12 +310,12 @@ onMounted(() => {
                 ]"
               >
                 <div class="flex flex-col items-center">
-                  <SvgIcon 
-                    :icon="`mdi:${ratio.icon}`" 
+                  <SvgIcon
+                    :icon="`mdi:${ratio.icon}`"
                     class="text-xl mb-1"
                     :class="selectedAspectRatio === ratio.value ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'"
                   />
-                  <span 
+                  <span
                     class="text-xs font-medium"
                     :class="selectedAspectRatio === ratio.value ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'"
                   >
@@ -333,6 +354,20 @@ onMounted(() => {
             />
           </div>
 
+          <!-- 模型选择 -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+              <SvgIcon icon="mdi:robot" class="text-blue-500" />
+              模型
+            </label>
+            <NSelect
+              v-model:value="selectedModel"
+              :options="modelOptions"
+              placeholder="选择模型（可选）"
+              clearable
+            />
+          </div>
+
           <!-- 参考图片上传 -->
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -359,7 +394,7 @@ onMounted(() => {
               </template>
               上传参考图片
             </NButton>
-            
+
             <!-- 已上传的图片预览 -->
             <div v-if="uploadedImages.length > 0" class="mt-3 grid grid-cols-3 gap-2">
               <div
@@ -460,9 +495,9 @@ onMounted(() => {
                 <div class="p-4">
                   <p class="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-3 min-h-[2.5rem]">{{ image.prompt || '无提示词' }}</p>
                   <div class="flex gap-2">
-                    <NButton 
-                      size="small" 
-                      quaternary 
+                    <NButton
+                      size="small"
+                      quaternary
                       class="flex-1"
                       @click.stop="downloadImage(image.url)"
                     >
@@ -471,9 +506,9 @@ onMounted(() => {
                       </template>
                       下载
                     </NButton>
-                    <NButton 
-                      size="small" 
-                      quaternary 
+                    <NButton
+                      size="small"
+                      quaternary
                       class="flex-1"
                       @click.stop="() => {
                         if (image.url) {

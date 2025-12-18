@@ -25,3 +25,13 @@ export function getModelListByCategory(category: string) {
 		},
 	});
 }
+/**
+ * 查询未隐藏模型
+ * @returns
+ */
+export function imageModelList() {
+	return request({
+		url: "/system/model/imgModelList",
+		method: "get",
+	});
+}

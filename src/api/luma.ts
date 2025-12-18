@@ -134,13 +134,13 @@ export const FeedLumaTask= async(id:string)=>{
             mlog('FeedLumaTask: Video URL set (fallback):', d.video.download_url);
         }
         
-        lumaS.save(d);
-        homeStore.setMyData({act:'FeedLumaTask'});
+            lumaS.save(d);
+            homeStore.setMyData({act:'FeedLumaTask'});
         
         // 如果已完成且有视频链接，停止轮询
         if( d.state=='completed' && d.video && (d.video?.download_url || d.video?.url) ){
             mlog('FeedLumaTask: Task completed, stopping polling');
-            break;
+                break;
         }
         await sleep(5*1000);
     }

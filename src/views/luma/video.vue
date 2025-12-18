@@ -1,4 +1,4 @@
-<script setup lang="ts">
+ <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import VoInput from './voInput.vue'
@@ -19,7 +19,7 @@ const goToCreateMiracles = () => {
 const goToClassic = () => {
   router.push('/video')
 }
-</script>
+ </script>
 <template>
   <div class="flex w-full h-full video-content">
     <!-- 经典模式 -->
@@ -36,9 +36,9 @@ const goToClassic = () => {
             </template>
             创建奇迹模式
           </NButton>
-        </div>
+    </div>
         <VoList />
-      </div>
+    </div>
     </template>
 
     <!-- 创建奇迹模式 -->
@@ -53,5 +53,5 @@ const goToClassic = () => {
       </div>
       <createMiraclesVideo />
     </template>
-  </div>
+</div>
 </template> 
