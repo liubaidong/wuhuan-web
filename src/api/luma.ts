@@ -90,14 +90,57 @@ export const FeedLumaTask= async(id:string)=>{
     if(id=='')return '';
     const lumaS = new lumaStore();
     for(let i=0; i<120;i++){
-        let d:LumaMedia = await lumaFetch('/generations/'+id );
-        if(d.id){
-            d.last_feed = new Date().getTime()
+        let response:any = await lumaFetch('/generations/'+id );
+        if(!response || !response.id) {
+            await sleep(5*1000);
+            continue;
+        }
+        
+        mlog('FeedLumaTask response:', response);
+        
+        // 转换后端返回格式为 LumaMedia 格式
+        let d:LumaMedia = {
+            id: response.id,
+            prompt: response.prompt || '',
+            state: response.status || response.state || 'pending',
+            created_at: response.created_at ? new Date(response.created_at * 1000).toISOString() : undefined,
+            last_feed: new Date().getTime()
+        };
+        
+        // 如果 progress 为 100 或 status 为 completed，且有 video_url，则设置 video
+        if ((response.progress === 100 || response.status === 'completed') && response.video_url) {
+            d.state = 'completed';
+            d.video = {
+                url: response.video_url,
+                download_url: response.video_url,
+                width: response.size ? parseInt(response.size.split('x')[0]) || 720 : 720,
+                height: response.size ? parseInt(response.size.split('x')[1]) || 1280 : 1280,
+                thumbnail: null
+            };
+            mlog('FeedLumaTask: Video URL set:', d.video.download_url);
+        } else if (response.video) {
+            // 如果已经有 video 对象，直接使用
+            d.video = response.video;
+        } else if (response.video_url && (response.progress === 100 || response.status === 'completed')) {
+            // 再次检查，确保 video_url 被正确设置
+            d.state = 'completed';
+            d.video = {
+                url: response.video_url,
+                download_url: response.video_url,
+                width: response.size ? parseInt(response.size.split('x')[0]) || 720 : 720,
+                height: response.size ? parseInt(response.size.split('x')[1]) || 1280 : 1280,
+                thumbnail: null
+            };
+            mlog('FeedLumaTask: Video URL set (fallback):', d.video.download_url);
+        }
+        
             lumaS.save(d);
             homeStore.setMyData({act:'FeedLumaTask'});
-            if( d.state=='completed' && d.video && d.video?.download_url  ){ //有的时候  completed 但是 没链接
+        
+        // 如果已完成且有视频链接，停止轮询
+        if( d.state=='completed' && d.video && (d.video?.download_url || d.video?.url) ){
+            mlog('FeedLumaTask: Task completed, stopping polling');
                 break;
-            }
         }
         await sleep(5*1000);
     }
