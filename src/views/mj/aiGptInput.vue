@@ -55,6 +55,7 @@ const props = defineProps<{
   renderOption?: RenderLabel;
 }>();
 const fsRef = ref();
+const aiModelRef = ref<InstanceType<typeof aiModel> | null>(null);
 const st = ref<{
   fileBase64: string[];
   isLoad: number;
@@ -101,12 +102,24 @@ const handleSubmit = () => {
   if (homeStore.myData.isLoader) {
     return;
   }
+  // 获取当前的 systemMessage，优先使用弹窗中最新修改的值（即使未保存）
+  let currentSystemMessage = nGptStore.value.systemMessage || gptConfigStore.myData.systemMessage;
+  // 如果弹窗是打开的，尝试从弹窗组件获取最新的 systemMessage
+  if (st.value.isShow && aiModelRef.value) {
+    // 通过 ref 访问弹窗组件暴露的 nGptStore
+    const modalStore = (aiModelRef.value as any).nGptStore;
+    if (modalStore && modalStore.value) {
+      // 优先使用弹窗中最新修改的值
+      currentSystemMessage = modalStore.value.systemMessage || currentSystemMessage;
+    }
+  }
   let obj = {
     prompt: mvalue.value,
     fileBase64: st.value.fileBase64,
     chatType: st.value.chatType ? 1 : 0,
     appId: gptConfigStore.myData.gpts ? gptConfigStore.myData.gpts.id : "",
-    uuid: chatStore.active ?? (uuid ? +uuid : undefined)
+    uuid: chatStore.active ?? (uuid ? +uuid : undefined),
+    systemMessage: currentSystemMessage // 将 systemMessage 一起发送
   };
   homeStore.setMyData({ act: "gpt.submit", actData: obj });
   mvalue.value = "";
@@ -610,7 +623,7 @@ function handleClear() {
     class="!max-w-[620px]"
     @close="st.isShow = false"
   >
-    <aiModel @close="st.isShow = false" />
+    <aiModel ref="aiModelRef" @close="st.isShow = false" />
   </NModal>
 
   <PromptStore v-model:visible="show"></PromptStore>

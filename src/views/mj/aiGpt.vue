@@ -173,9 +173,11 @@ watch(()=>homeStore.myData.act, async (n)=>{
         let historyMesg=  await getMessage();
         mlog('historyMesg', historyMesg );
         //return ;
-        // let message= [ {  "role": "system", "content": getSystemMessage(  +uuid2) },
-        //         ...historyMesg ];
-        let message= [...historyMesg ];
+        // 优先使用 actData 中的 systemMessage，如果没有则使用 getSystemMessage
+        const systemMessage = dd.systemMessage || getSystemMessage(+uuid2);
+        let message = systemMessage 
+          ? [{ "role": "system", "content": systemMessage }, ...historyMesg]
+          : [...historyMesg];
                 
         if( dd.fileBase64 && dd.fileBase64.length>0 ){
             if(isCanBase64Model(model)){ 

@@ -222,6 +222,11 @@ const reSet = () => {
 	nGptStore.value = gptConfigStore.myData;
 }
 
+// 暴露 nGptStore 给父组件，以便在发送时获取最新的 systemMessage
+defineExpose({
+	nGptStore
+})
+
 </script>
 <template>
 	<section class="mb-5 justify-between items-center">

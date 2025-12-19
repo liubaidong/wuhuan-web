@@ -506,13 +506,15 @@ onMounted(() => {
 
     <!-- 视频预览模态框 -->
     <NModal v-model:show="showVideoModal" preset="card" title="视频预览" style="max-width: 90vw;">
-      <video
-        v-if="selectedVideo"
-        :src="selectedVideo"
-        controls
-        class="w-full"
-        autoplay
-      />
+      <div class="flex justify-center items-center">
+        <video
+          v-if="selectedVideo"
+          :src="selectedVideo"
+          controls
+          class="video-preview"
+          autoplay
+        />
+      </div>
     </NModal>
   </div>
 </template>
@@ -536,6 +538,15 @@ onMounted(() => {
 
 .video-card:hover video {
   transform: scale(1.05);
+}
+
+.video-preview {
+  width: 720px;
+  height: 1280px;
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  background-color: #000;
 }
 </style>
 
