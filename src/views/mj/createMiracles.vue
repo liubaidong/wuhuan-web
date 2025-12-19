@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { NButton, NCard, NInput, NSelect, NImage, NGrid, NGridItem, useMessage, NModal, NSpin } from 'naive-ui'
 import { SvgIcon } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
-import { t } from '@/locales'
+// import { t } from '@/locales' // 暂时未使用
 import { upImg, mjFetch, mlog } from '@/api'
 import { homeStore, useChatStore } from '@/store'
 import { imageModelList } from '@/api/model'
@@ -27,7 +27,9 @@ const selectedImage = ref('')
 
 // 从聊天记录加载已生成的图片
 const loadGeneratedImages = () => {
-  const chats = chatStore.getChatByUuid(chatStore.active)
+  const activeUuid = chatStore.active ?? undefined
+  if (!activeUuid) return
+  const chats = chatStore.getChatByUuid(activeUuid)
   const images: any[] = []
 
   chats.forEach((chat: Chat.Chat) => {
@@ -52,7 +54,9 @@ watch(
     if (act === 'updateChat' || act === 'draw') {
       // 延迟加载，确保数据已更新
       setTimeout(() => {
-        const chats = chatStore.getChatByUuid(chatStore.active)
+        const activeUuid = chatStore.active ?? undefined
+        if (!activeUuid) return
+        const chats = chatStore.getChatByUuid(activeUuid)
         chats.forEach((chat: Chat.Chat) => {
           if (!chat.inversion && chat.opt?.imageUrl) {
             // 更新对应任务的图片URL
@@ -138,6 +142,7 @@ const generateImage = async () => {
       notifyHook: '',
       state: '',
       botType: 'MID_JOURNEY',
+      model: selectedModel.value || '', // 将选中的模型传到后台
     }
 
     // 调用后端API - 使用现有的 imagine 接口
@@ -192,6 +197,27 @@ const clearInput = () => {
   uploadedImages.value = []
   selectedStyle.value = ''
   selectedQuality.value = ''
+}
+
+// 复制链接到剪贴板
+const copyImageUrl = (imageUrl: string) => {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(imageUrl)
+      message.success('链接已复制到剪贴板')
+    } else {
+      // 降级方案：使用传统方法
+      const textArea = document.createElement('textarea')
+      textArea.value = imageUrl
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      message.success('链接已复制到剪贴板')
+    }
+  } catch (e) {
+    message.error('复制失败')
+  }
 }
 
 // 下载图片
@@ -510,12 +536,7 @@ onMounted(() => {
                       size="small"
                       quaternary
                       class="flex-1"
-                      @click.stop="() => {
-                        if (image.url) {
-                          navigator.clipboard.writeText(image.url);
-                          message.success('链接已复制到剪贴板');
-                        }
-                      }"
+                      @click.stop="copyImageUrl(image.url)"
                     >
                       <template #icon>
                         <SvgIcon icon="mdi:share" />
