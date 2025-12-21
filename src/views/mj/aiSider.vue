@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, onMounted, Component, h } from "vue";
-import { PromptStore, SvgIcon } from '@/components/common'
+import { PromptStore, SvgIcon, ConsumptionRecord } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 const { isMobile } = useBasicLayout()
 import { removeToken } from '@/store/modules/auth/helper'
@@ -16,7 +16,8 @@ import to from "await-to-js";
 import {
   Settings as settings,
   Storefront as storefront,
-  LogOut as out
+  LogOut as out,
+  ReceiptOutline as receipt
 } from '@vicons/ionicons5'
 import { useChatStore, useUserStore } from '@/store'
 
@@ -29,6 +30,7 @@ const userStore = useUserStore()
 const userInfo = computed(() => userStore.userInfo)
 
 const show = ref(false)
+const showConsumptionRecord = ref(false)
 const urouter = useRouter() //
 const isLogin = computed(() => {
   return localStorage.getItem('TOKEN')
@@ -110,6 +112,11 @@ const menuOptions = ref([
     icon: renderIcon(settings)
   },
   {
+    label: '消费记录查询',
+    key: 'consumptionRecord',
+    icon: renderIcon(receipt)
+  },
+  {
     label: '立即充值',
     key: 'buy',
     icon: renderIcon(storefront)
@@ -124,6 +131,8 @@ const menuOptions = ref([
 const handleSelect = (key: string) => {
   if (key === 'accountSettings') {
     st.value.show = true
+  } else if (key === 'consumptionRecord') {
+    showConsumptionRecord.value = true
   } else if (key === 'logout') {
     handleReset()
   } else if (key === 'buy') {
@@ -240,6 +249,7 @@ const handleSelect = (key: string) => {
   </div>
   <Setting v-if="st.show" v-model:visible="st.show" />
   <PromptStore v-model:visible="show"></PromptStore>
+  <ConsumptionRecord v-model:visible="showConsumptionRecord"></ConsumptionRecord>
 
 </template>
 

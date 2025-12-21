@@ -274,30 +274,140 @@ export const subModel= async (opt: subModelType)=>{
             headers: headers,
             signal:opt.signal,
             onMessage: async (data:string)=> {
-                 //mlog('🐞测试'  ,  data )  ;
-                 if(data=='[DONE]') opt.onMessage({text:'',isFinish:true})
-                 else {
-                    try{
-                        // TODO 思考处理，DeepSeek  API 字段reasoning_content ，本地部署标签<think>
-                        const obj= JSON.parse(data );
-                        // 若是错误 JSON（如 code/reason/message），走错误回调，不拼接为文本
-                        const hasErrorShape = obj && (obj.error || obj.code || obj.reason || obj.message)
-                        const hasNoChoices = !obj?.choices
-                        if (hasErrorShape && hasNoChoices) {
-                            opt.onError && opt.onError(obj)
-                            return
-                        }
-                        opt.onMessage({text:obj.choices[0].delta?.content??obj.choices[0].delta?.reasoning_content??'' ,isFinish:obj.choices[0].finish_reason!=null })
-                    }catch{
-                        // 非 JSON 或解析失败：若包含明显鉴权失败关键词，则走错误回调
-                        const s = (data || '').toString()
-                        if (/FAILED_TO_AUTH|unauthorized|未认证|认证失败|invalid\s*api\s*key/i.test(s)) {
-                            opt.onError && opt.onError({ reason: s })
-                            return
-                        }
-                        opt.onMessage({ text: data, isFinish: false });
-                    }
-
+                 //mlog('🐞SSE数据', data)
+                 
+                 // 处理 [DONE] 标记
+                 const trimmedData = data.trim()
+                 if(trimmedData === '[DONE]') {
+                     opt.onMessage({text:'',isFinish:true})
+                     return
+                 }
+                 
+                 // 跳过空数据
+                 if (!trimmedData || trimmedData.length === 0) {
+                     return
+                 }
+                 
+                 // 清理数据：移除可能的 data: 前缀（eventsource-parser 应该已经处理了，但为了安全起见）
+                 let cleanData = trimmedData
+                 if (cleanData.startsWith('data: ')) {
+                     cleanData = cleanData.slice(6).trim()
+                 }
+                 
+                 // 如果清理后是 [DONE]，直接返回
+                 if (cleanData === '[DONE]') {
+                     opt.onMessage({text:'',isFinish:true})
+                     return
+                 }
+                 
+                 // 跳过空数据
+                 if (!cleanData || cleanData.length === 0) {
+                     return
+                 }
+                 
+                 try{
+                     // 解析 JSON 数据
+                     const obj = JSON.parse(cleanData)
+                     
+                     // 检查是否是错误响应
+                     if (obj && (obj.error || (obj.code && obj.code !== 200))) {
+                         const hasNoChoices = !obj?.choices || (Array.isArray(obj.choices) && obj.choices.length === 0)
+                         if (hasNoChoices) {
+                             opt.onError && opt.onError(obj)
+                             return
+                         }
+                     }
+                     
+                     // 提取内容 - 支持多种格式
+                     let content = ''
+                     let finishReason = null
+                     
+                     // 标准格式：choices[0].delta.content
+                     if (obj.choices && Array.isArray(obj.choices) && obj.choices.length > 0) {
+                         const choice = obj.choices[0]
+                         content = choice.delta?.content ?? choice.delta?.reasoning_content ?? ''
+                         finishReason = choice.finish_reason
+                     }
+                     
+                     // 如果 choices 数组为空，但存在 usage，说明是最后一条消息（usage 统计）
+                     if ((!obj.choices || obj.choices.length === 0) && obj.usage) {
+                         // 这是最后一条消息，只包含 usage 统计，不包含内容
+                         opt.onMessage({text:'',isFinish:true})
+                         return
+                     }
+                     
+                     // 发送消息（即使 content 为空，如果有 finishReason 也要发送，表示流结束）
+                     if (content || finishReason) {
+                         opt.onMessage({
+                             text: content || '', // 即使为空也发送，因为有些 chunk 的 content 就是空的
+                             isFinish: finishReason != null && finishReason !== null
+                         })
+                     }
+                 } catch (parseError) {
+                     // JSON 解析失败
+                     const errorMsg = cleanData.toString()
+                     
+                     // 检查是否是鉴权错误
+                     if (/FAILED_TO_AUTH|unauthorized|未认证|认证失败|invalid\s*api\s*key/i.test(errorMsg)) {
+                         opt.onError && opt.onError({ reason: errorMsg })
+                         return
+                     }
+                     
+                     // 如果数据包含多个 data: 行（原始 SSE 格式），手动解析
+                     if (errorMsg.includes('data: ') && errorMsg.includes('\n')) {
+                         const lines = errorMsg.split('\n')
+                         for (const line of lines) {
+                             const trimmedLine = line.trim()
+                             if (trimmedLine.startsWith('data: ')) {
+                                 const jsonStr = trimmedLine.slice(6).trim()
+                                 
+                                 // 处理 [DONE] 标记
+                                 if (jsonStr === '[DONE]') {
+                                     opt.onMessage({text:'',isFinish:true})
+                                     continue
+                                 }
+                                 
+                                 if (jsonStr && jsonStr.length > 0) {
+                                     try {
+                                         const obj = JSON.parse(jsonStr)
+                                         
+                                         // 检查是否是 usage 统计（最后一条消息）
+                                         if ((!obj.choices || obj.choices.length === 0) && obj.usage) {
+                                             opt.onMessage({text:'',isFinish:true})
+                                             continue
+                                         }
+                                         
+                                         // 提取内容
+                                         const content = obj.choices?.[0]?.delta?.content ?? ''
+                                         const finishReason = obj.choices?.[0]?.finish_reason
+                                         
+                                         if (content || finishReason) {
+                                             opt.onMessage({
+                                                 text: content || '',
+                                                 isFinish: finishReason != null && finishReason !== null
+                                             })
+                                         }
+                                     } catch (e) {
+                                         // 忽略解析失败的行
+                                     }
+                                 }
+                             }
+                         }
+                         return
+                     }
+                     
+                     // 如果不是技术性的数据流格式，可能是纯文本内容
+                     const isTechnicalData = errorMsg.includes('chatcmpl-') || 
+                                           errorMsg.includes('chat.completion.chunk') || 
+                                           errorMsg.includes('"id"') || 
+                                           errorMsg.includes('"object"') ||
+                                           errorMsg.includes('"choices"')
+                     
+                     if (!isTechnicalData && errorMsg.length > 0) {
+                         // 只显示非技术性的文本内容
+                         opt.onMessage({ text: errorMsg, isFinish: false })
+                     }
+                     // 否则忽略技术性的数据流格式
                  }
             },
             onError(e ){
