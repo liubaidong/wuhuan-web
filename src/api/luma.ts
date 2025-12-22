@@ -103,8 +103,9 @@ export const FeedLumaTask= async(id:string)=>{
             id: response.id,
             prompt: response.prompt || '',
             state: response.status || response.state || 'pending',
-            created_at: response.created_at ? new Date(response.created_at * 1000).toISOString() : undefined,
-            last_feed: new Date().getTime()
+            created_at: response.created_at ? (typeof response.created_at === 'number' ? new Date(response.created_at).toISOString() : response.created_at) : undefined,
+            last_feed: new Date().getTime(),
+            progress: response.progress !== undefined ? Number(response.progress) : undefined, // 保存进度百分比
         };
         
         // 如果 progress 为 100 或 status 为 completed，且有 video_url，则设置 video

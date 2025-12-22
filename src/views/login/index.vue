@@ -83,7 +83,7 @@ const navigateToRegister = () => {
 };
 
 
-// 计算背景样式，适配暗黑模式
+// 计算背景样式，适配暗黑模式 - 使用暖橙色渐变
 const brandSectionStyle = computed(() => {
   const isDark = themeVars.value.bodyColor.startsWith('#1') ||
     themeVars.value.bodyColor.startsWith('#2') ||
@@ -91,8 +91,10 @@ const brandSectionStyle = computed(() => {
 
   return {
     background: isDark
-      ? 'linear-gradient(135deg, #003b8e, #0058d9)'
-      : 'linear-gradient(135deg, #1867c0, #5cbbf6)'
+      ? 'linear-gradient(135deg, #ff9a56 0%, #ffad56 25%, #ffc356 50%, #ffd856 75%, #ffeb56 100%)'
+      : 'linear-gradient(135deg, #ff9a56 0%, #ffad56 25%, #ffc356 50%, #ffd856 75%, #ffeb56 100%)',
+    position: 'relative',
+    overflow: 'hidden'
   };
 });
 
@@ -192,8 +194,9 @@ const brandSectionStyle = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--n-body-color);
+  background: transparent;
   padding: 20px;
+  position: relative;
 }
 
 .login-content {
@@ -201,13 +204,29 @@ const brandSectionStyle = computed(() => {
   width: 900px;
   max-width: 100%;
   min-height: 500px;
-  border-radius: 16px;
+  border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 20px 60px rgba(255, 154, 86, 0.3);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 html.dark .login-content {
-  outline: 2px solid rgb(17, 19, 17) !important;
+  background: rgba(30, 30, 30, 0.95);
+  box-shadow: 0 20px 60px rgba(255, 154, 86, 0.2);
 }
 
 /* 左侧品牌区域 */
@@ -222,6 +241,28 @@ html.dark .login-content {
   overflow: hidden;
 }
 
+.brand-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+  animation: pulse 4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.5;
+  }
+}
+
 .brand-content {
   position: relative;
   z-index: 2;
@@ -233,6 +274,19 @@ html.dark .login-content {
   font-weight: bold;
   margin-bottom: 1rem;
   color: white;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  animation: titleFadeIn 0.8s ease-out 0.2s both;
+}
+
+@keyframes titleFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .brand-description {
@@ -240,17 +294,34 @@ html.dark .login-content {
   opacity: 0.9;
   max-width: 300px;
   margin: 0 auto;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+  animation: descFadeIn 0.8s ease-out 0.4s both;
+}
+
+@keyframes descFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 0.95;
+    transform: translateY(0);
+  }
 }
 
 /* 右侧表单区域 */
 .form-wrapper {
   flex: 1;
-  background: var(--n-color-modal);
+  background: rgba(255, 255, 255, 0.98);
   padding: 40px;
   display: flex;
   flex-direction: column;
-  border: #07c160;
+  backdrop-filter: blur(10px);
+}
+
+html.dark .form-wrapper {
+  background: rgba(30, 30, 30, 0.98);
 }
 
 .form-title {
@@ -269,7 +340,8 @@ html.dark .login-content {
   font-weight: 500;
   color: var(--n-text-color);
   padding-bottom: 8px;
-  border-bottom: 2px solid var(--n-primary-color);
+  border-bottom: 2px solid #ff9a56;
+  transition: all 0.3s ease;
 }
 
 .form-content {
@@ -302,6 +374,15 @@ html.dark .login-content {
   transition: all 0.3s ease;
 }
 
+.custom-input:hover {
+  border-color: #ff9a56;
+}
+
+.custom-input:focus {
+  border-color: #ff9a56;
+  box-shadow: 0 0 0 2px rgba(255, 154, 86, 0.2);
+}
+
 .additional-links {
   display: flex;
   justify-content: flex-end;
@@ -319,6 +400,19 @@ html.dark .login-content {
 .login-button {
   height: 40px;
   font-size: 16px;
+  background: linear-gradient(135deg, #ff9a56 0%, #ffad56 50%, #ffc356 100%);
+  border: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.login-button:hover {
+  background: linear-gradient(135deg, #ffad56 0%, #ffc356 50%, #ffd856 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(255, 154, 86, 0.4);
+}
+
+.login-button:active {
+  transform: translateY(0);
 }
 
 .alternative-logins {

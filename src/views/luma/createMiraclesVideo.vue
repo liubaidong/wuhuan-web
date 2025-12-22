@@ -429,10 +429,33 @@
 													videoEl.currentTime = 0;
 												}"
 											/>
-											<div v-else class="w-full h-full flex flex-col items-center justify-center">
+											<div v-else class="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
 												<NSpin size="large" />
-												<p class="text-sm text-gray-500 dark:text-gray-400 mt-3">生成中...</p>
-												<p v-if="video.state" class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+												<div class="mt-6 w-full max-w-xs space-y-3">
+													<!-- 进度条 -->
+													<div v-if="video.progress !== undefined" class="w-full">
+														<NProgress
+															type="line"
+															:percentage="video.progress"
+															:show-indicator="false"
+															:height="12"
+															status="success"
+															class="mb-2 video-progress"
+														/>
+														<!-- 进度百分比文字 -->
+														<div class="flex items-center justify-between mt-2">
+															<span class="text-xs text-gray-500 dark:text-gray-400">生成进度</span>
+															<span class="text-sm font-bold bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent">
+																{{ video.progress }}%
+															</span>
+														</div>
+													</div>
+													<!-- 如果没有进度信息，显示生成中 -->
+													<p v-else class="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center">
+														生成中...
+													</p>
+												</div>
+												<p v-if="video.state" class="text-xs text-gray-400 dark:text-gray-500 mt-3">
 													状态: {{ video.state }}
 												</p>
 											</div>
@@ -449,8 +472,8 @@
 										</div>
 									</div>
 									<div class="p-4">
-										<p class="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-3 min-h-[2.5rem]">
-											{{ video.prompt || '无描述' }}
+										<p v-if="video.prompt" class="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-3 min-h-[2.5rem]">
+											{{ video.prompt }}
 										</p>
 										<div class="flex gap-2">
 											<NButton
@@ -547,5 +570,14 @@
 		max-height: 90vh;
 		object-fit: contain;
 		background-color: #000;
+	}
+
+	/* 进度条样式 - 使用暖橙色渐变 */
+	:deep(.video-progress .n-progress-line-fill) {
+		background: linear-gradient(90deg, #ff9a56 0%, #ffad56 50%, #ffc356 100%) !important;
+	}
+
+	:deep(.video-progress .n-progress-line-rail) {
+		background-color: rgba(255, 154, 86, 0.2) !important;
 	}
 	</style>

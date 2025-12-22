@@ -23,10 +23,20 @@ export function useTheme() {
   const themeOverrides = computed<GlobalThemeOverrides>(() => {
     if (isDark.value) {
       return {
-        common: {},
+        common: {
+          primaryColor: '#ff9a56',
+          primaryColorHover: '#ffad56',
+          primaryColorPressed: '#ffc356',
+        },
       }
     }
-    return {}
+    return {
+      common: {
+        primaryColor: '#ff9a56',
+        primaryColorHover: '#ffad56',
+        primaryColorPressed: '#ffc356',
+      },
+    }
   })
   const { isMobile } = useBasicLayout()
   watch(
@@ -52,3 +62,4 @@ export function useTheme() {
 
   return { theme, themeOverrides }
 }
+

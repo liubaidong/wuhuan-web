@@ -4,13 +4,15 @@ import { NButton, NCard, NInput, NSelect, NImage, NGrid, NGridItem, useMessage, 
 import { SvgIcon } from '@/components/common'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 // import { t } from '@/locales' // 暂时未使用
-import { upImg, mjFetch, mlog } from '@/api'
+import { upImg, mjFetch, mlog, getMjAll, localGet, url2base64, mjImgUrl } from '@/api'
 import { homeStore, useChatStore } from '@/store'
 import { imageModelList } from '@/api/model'
+import { mjStore, type MjImage } from '@/api/mjStore'
 
 const { isMobile } = useBasicLayout()
 const message = useMessage()
 const chatStore = useChatStore()
+const mjS = new mjStore()
 
 // 状态管理
 const prompt = ref('')
@@ -25,52 +27,240 @@ const generatedImages = ref<any[]>([])
 const showImageModal = ref(false)
 const selectedImage = ref('')
 
-// 从聊天记录加载已生成的图片
-const loadGeneratedImages = () => {
-  const activeUuid = chatStore.active ?? undefined
-  if (!activeUuid) return
-  const chats = chatStore.getChatByUuid(activeUuid)
-  const images: any[] = []
-
-  chats.forEach((chat: Chat.Chat) => {
-    if (!chat.inversion && chat.opt?.imageUrl) {
-      images.push({
-        id: chat.myid || Date.now(),
-        url: chat.opt.imageUrl,
-        prompt: chat.text || chat.requestOptions?.prompt || '',
-        createdAt: chat.dateTime || new Date().toISOString(),
-        taskId: chat.mjID,
+// 从存储和聊天记录加载已生成的图片 - 参照视频功能
+const loadGeneratedImages = async () => {
+  try {
+    mlog('开始加载图片列表...')
+    
+    // 首先从本地存储加载历史图片
+    const storedImages = mjS.getObjs()
+    mlog('从存储加载的图片:', storedImages.length)
+    
+    // 同时从聊天记录加载（作为补充）
+    const d = await getMjAll(chatStore.$state)
+    mlog('getMjAll 返回数据:', d?.length, d)
+    
+    // 合并存储的图片和聊天记录中的图片
+    const allImagesMap = new Map<string, any>()
+    
+    // 先添加存储的图片
+    storedImages.forEach((img: MjImage) => {
+      if (img.id) {
+        allImagesMap.set(img.id, {
+          ...img,
+          fromStorage: true,
+        })
+      }
+    })
+    
+    // 再添加聊天记录中的图片（如果不存在或需要更新）
+    if (d && d.length > 0) {
+      const rz = d.filter((v: any) => v.mjID && v.opt).map((v: any) => {
+        const imageId = v.mjID || v.myid || Date.now()
+        return {
+          mjID: v.mjID,
+          id: imageId,
+          src: v.opt.imageUrl || '',
+          url: '', // 先设为空，等待加载 base64
+          prompt: v.opt.promptEn || v.text || v.requestOptions?.prompt || v.opt.prompt || '',
+          createdAt: v.dateTime || v.opt.startTime || new Date().toISOString(),
+          taskId: v.mjID,
+          loading: !v.opt.imageUrl, // 如果没有图片URL，显示加载状态
+          image_url: v.opt.imageUrl || '',
+          action: v.opt.action,
+          time: v.opt.startTime || (v.dateTime ? new Date(v.dateTime).getTime() : Date.now()),
+          status: v.opt.status,
+          progress: v.opt.progress,
+        }
       })
-    }
-  })
 
-  generatedImages.value = images.reverse() // 最新的在前
+      // 将聊天记录中的图片添加到 Map（如果不存在或需要更新）
+      for (const v of rz) {
+        if (!v.mjID) continue
+        const existing = allImagesMap.get(v.id)
+        // 如果存储中没有，或者聊天记录中的图片更新（有URL而存储中没有）
+        if (!existing || (!existing.image_url && v.image_url)) {
+          allImagesMap.set(v.id, v)
+        }
+      }
+    }
+
+    // 处理所有图片，加载 base64 缓存
+    const images: any[] = []
+    for (const [id, v] of allImagesMap) {
+      if (!v || (!v.mjID && !v.id)) continue
+      
+      const mjId = v.mjID || v.id || id
+      if (!mjId) continue
+      
+      const key = 'img:' + mjId
+      
+      try {
+        // 如果有图片 URL
+        if (v.image_url || v.url) {
+          const imageUrl = v.image_url || v.url
+          let base64 = await localGet(key)
+          if (base64) {
+            v.url = base64
+            v.image_url = base64
+            v.loading = false
+          } else if (imageUrl) {
+            // 如果没有缓存，使用原始 URL，并异步加载 base64
+            v.url = mjImgUrl(imageUrl)
+            v.image_url = imageUrl
+            v.loading = false
+            // 异步加载并缓存
+            url2base64(mjImgUrl(imageUrl), key).then((result: any) => {
+              mlog('图片已保存>>', key)
+              // 更新对应图片的 URL
+              const image = generatedImages.value.find(img => (img.mjID || img.id) === mjId)
+              if (image && result && result.base64) {
+                image.url = result.base64
+                image.image_url = result.base64
+                // 更新存储
+                try {
+                  mjS.save({
+                    id: image.id || mjId,
+                    mjID: image.mjID || mjId,
+                    url: result.base64,
+                    image_url: result.base64,
+                    prompt: image.prompt || '',
+                    createdAt: image.createdAt || new Date().toISOString(),
+                    taskId: image.taskId || image.mjID || mjId,
+                    loading: false,
+                    status: image.status,
+                    progress: image.progress,
+                    time: image.time || Date.now(),
+                  })
+                } catch (e) {
+                  mlog('更新存储失败', e)
+                }
+              }
+            }).catch((error) => {
+              mlog('图片加载失败', error)
+            })
+          } else {
+            // 如果还没有图片 URL，显示加载状态
+            v.url = ''
+            v.image_url = ''
+            v.loading = true
+          }
+        } else {
+          // 如果还没有图片 URL，显示加载状态
+          v.url = ''
+          v.image_url = ''
+          v.loading = true
+        }
+        images.push(v)
+      } catch (e) {
+        mlog('加载图片失败', e)
+        // 即使加载失败也显示原始 URL（如果有）
+        if (v.image_url) {
+          v.url = mjImgUrl(v.image_url)
+        }
+        v.loading = false
+        images.push(v)
+      }
+    }
+
+    // 按时间排序，最新的在前
+    generatedImages.value = images.sort((a: any, b: any) => (b.time || 0) - (a.time || 0))
+    
+    // 保存所有图片到存储（确保持久化）
+    generatedImages.value.forEach((img: any) => {
+      if (img.id) {
+        try {
+          mjS.save({
+            id: img.id,
+            mjID: img.mjID || img.id,
+            url: img.url || img.image_url || '',
+            image_url: img.image_url || img.url || '',
+            prompt: img.prompt || '',
+            createdAt: img.createdAt || new Date().toISOString(),
+            taskId: img.taskId || img.mjID || img.id,
+            loading: img.loading || false,
+            status: img.status,
+            progress: img.progress,
+            time: img.time || Date.now(),
+          })
+        } catch (e) {
+          mlog('保存图片到存储失败', e)
+        }
+      }
+    })
+    
+    mlog('图片列表加载完成，共', generatedImages.value.length, '张图片')
+    mlog('图片列表详情:', generatedImages.value.map(img => ({ mjID: img.mjID, url: img.url ? '有URL' : '无URL', loading: img.loading })))
+  } catch (error) {
+    mlog('loadGeneratedImages error:', error)
+    generatedImages.value = []
+  }
 }
 
-// 监听聊天更新，更新图片状态
+// 监听聊天更新，更新图片状态 - 参照普通模式
 watch(
   () => homeStore.myData.act,
-  (act, oldAct) => {
-    if (act === 'updateChat' || act === 'draw') {
-      // 延迟加载，确保数据已更新
-      setTimeout(() => {
-        const activeUuid = chatStore.active ?? undefined
-        if (!activeUuid) return
-        const chats = chatStore.getChatByUuid(activeUuid)
-        chats.forEach((chat: Chat.Chat) => {
-          if (!chat.inversion && chat.opt?.imageUrl) {
-            // 更新对应任务的图片URL
-            const image = generatedImages.value.find(img => img.taskId === chat.mjID)
-            if (image && !image.url) {
-              image.url = chat.opt.imageUrl
-              image.loading = false
-            }
+  async (act, oldAct) => {
+    mlog('createMiracles watch act:', act)
+    if (act === 'updateChat') {
+      // 当聊天更新时，检查是否有新的图片或进度更新
+      const actData: any = homeStore.myData.actData
+      if (actData && actData.mjID) {
+        mlog('检测到图片更新', actData.mjID, actData.opt?.imageUrl, actData.opt?.progress)
+        
+        // 如果有图片URL，立即保存到存储
+        if (actData.opt?.imageUrl) {
+          const imageId = actData.mjID
+          try {
+            mjS.save({
+              id: imageId,
+              mjID: imageId,
+              url: actData.opt.imageUrl,
+              image_url: actData.opt.imageUrl,
+              prompt: actData.text || actData.requestOptions?.prompt || '',
+              createdAt: actData.dateTime || new Date().toISOString(),
+              taskId: imageId,
+              loading: false,
+              status: actData.opt.status,
+              progress: actData.opt.progress,
+              time: actData.opt.startTime || Date.now(),
+            })
+          } catch (e) {
+            mlog('保存图片到存储失败', e)
           }
-        })
-        // 重新加载所有图片
+        }
+        
+        // 延迟加载，确保数据已更新
+        setTimeout(() => {
+          loadGeneratedImages()
+        }, 300)
+      }
+    } else if (act === 'mjReload') {
+      // 当图片重新加载时
+      mlog('mjReload 触发，重新加载图片')
+      setTimeout(() => {
+        loadGeneratedImages()
+      }, 300)
+    } else if (act === 'draw') {
+      // 当提交新任务时，立即添加占位项，然后等待更新
+      mlog('draw 触发，重新加载图片')
+      setTimeout(() => {
         loadGeneratedImages()
       }, 500)
     }
+  },
+  { deep: true }
+)
+
+// 额外监听 chatStore 的变化，确保图片能及时更新
+watch(
+  () => chatStore.chat,
+  () => {
+    // 当聊天记录变化时，重新加载图片（使用防抖，避免频繁更新）
+    clearTimeout((window as any).__createMiraclesLoadTimer)
+    ;(window as any).__createMiraclesLoadTimer = setTimeout(() => {
+      loadGeneratedImages()
+    }, 800)
   },
   { deep: true }
 )
@@ -148,29 +338,134 @@ const generateImage = async () => {
     // 调用后端API - 使用现有的 imagine 接口
     const response = await mjFetch('/mj/submit/imagine', params)
 
-    if (response && response.result) {
-      // 将任务添加到生成列表，等待结果
-      generatedImages.value.unshift({
-        id: response.result,
+    // 处理 Gemini 模型返回格式（code: 200, msg 包含 JSON 字符串）
+    if (response && response.code === 200 && response.msg) {
+      try {
+        // 解析 msg 字段中的 JSON 字符串
+        const msgData = typeof response.msg === 'string' ? JSON.parse(response.msg) : response.msg
+        
+        // 提取图片 URL（Gemini 格式：candidates[0].content.parts[0].inlineData.data）
+        let imageUrl = ''
+        if (msgData.candidates && msgData.candidates.length > 0) {
+          const candidate = msgData.candidates[0]
+          if (candidate.content?.parts && candidate.content.parts.length > 0) {
+            const part = candidate.content.parts[0]
+            if (part.inlineData?.data) {
+              imageUrl = part.inlineData.data
+            }
+          }
+        }
+
+        if (imageUrl) {
+          // 如果直接返回了图片URL，立即显示
+          const imageId = `gemini-${Date.now()}`
+          const newImage: any = {
+            id: imageId,
+            mjID: imageId,
+            url: imageUrl, // 直接使用返回的URL
+            prompt: prompt.value,
+            createdAt: new Date().toISOString(),
+            taskId: imageId,
+            loading: false,
+            image_url: imageUrl,
+            time: Date.now(),
+            status: 'SUCCESS',
+          }
+          generatedImages.value.unshift(newImage)
+          
+          // 保存到存储
+          mjS.save({
+            id: imageId,
+            mjID: imageId,
+            url: imageUrl,
+            image_url: imageUrl,
+            prompt: prompt.value,
+            createdAt: new Date().toISOString(),
+            taskId: imageId,
+            loading: false,
+            status: 'SUCCESS',
+            time: Date.now(),
+          })
+          
+          message.success('图片生成成功！')
+          
+          // 异步缓存图片
+          const key = 'img:' + imageId
+          url2base64(imageUrl, key).then((result: any) => {
+            mlog('图片已缓存>>', key)
+            const image = generatedImages.value.find(img => img.id === imageId)
+            if (image && result && result.base64) {
+              image.url = result.base64
+              image.image_url = result.base64
+              // 更新存储
+              mjS.save({
+                id: imageId,
+                mjID: imageId,
+                url: result.base64,
+                image_url: result.base64,
+                prompt: prompt.value,
+                createdAt: new Date().toISOString(),
+                taskId: imageId,
+                loading: false,
+                status: 'SUCCESS',
+                time: Date.now(),
+              })
+            }
+          }).catch((error) => {
+            mlog('图片缓存失败', error)
+          })
+        } else {
+          message.warning('未找到图片URL')
+        }
+      } catch (parseError) {
+        mlog('解析响应数据失败:', parseError)
+        message.error('解析响应数据失败')
+      }
+    } else if (response && response.result) {
+      // 处理 Midjourney 格式（返回 taskId，需要等待）
+      const taskId = response.result
+      const newImage: any = {
+        id: taskId,
+        mjID: taskId,
         url: '', // 等待生成完成后更新
         prompt: prompt.value,
         createdAt: new Date().toISOString(),
-        taskId: response.result,
+        taskId: taskId,
         loading: true,
+        image_url: '',
+        time: Date.now(),
+      }
+      generatedImages.value.unshift(newImage)
+      
+      // 保存到存储（即使还在生成中）
+      mjS.save({
+        id: taskId,
+        mjID: taskId,
+        url: '',
+        image_url: '',
+        prompt: prompt.value,
+        createdAt: new Date().toISOString(),
+        taskId: taskId,
+        loading: true,
+        time: Date.now(),
       })
+      
       message.success('图片生成任务已提交，请稍候...')
 
       // 使用现有的任务处理机制
       homeStore.setMyData({
         act: 'draw',
         actData: {
-          taskId: response.result,
+          taskId: taskId,
           prompt: prompt.value,
         }
       })
     } else if (response?.code === 21) {
       // 需要模态确认
       message.info('请确认生成参数')
+    } else {
+      mlog('未知的响应格式:', response)
+      message.warning('未知的响应格式，请查看控制台')
     }
   } catch (error: any) {
     mlog('generateImage error:', error)
@@ -505,14 +800,22 @@ onMounted(() => {
                     <NSpin size="large" />
                   </div>
                   <img
-                    v-if="image.url"
+                    v-if="image.url && !image.loading"
                     :src="image.url"
                     class="w-full h-auto rounded-t-lg transition-transform duration-300 group-hover:scale-105"
                     :alt="image.prompt"
-                    @error="image.url = ''"
+                    @error="() => { image.url = image.image_url || image.src || ''; image.loading = false; }"
                   />
                   <div v-else class="w-full aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-t-lg flex items-center justify-center">
-                    <NSpin size="large" />
+                    <div class="text-center">
+                      <NSpin size="large" />
+                      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400" v-if="image.progress">
+                        {{ image.progress }}
+                      </p>
+                      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400" v-else>
+                        生成中...
+                      </p>
+                    </div>
                   </div>
                   <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-end justify-center pb-4">
                     <SvgIcon icon="mdi:eye" class="text-white text-2xl" />

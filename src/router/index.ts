@@ -50,11 +50,6 @@ const routes: RouteRecordRaw[] = [
         name: 'draw',
         component: () => import('@/views/mj/draw.vue'),
       },
-      {
-        path: '/draw/create-miracles',
-        name: 'createMiracles',
-        component: () => import('@/views/mj/createMiracles.vue'),
-      },
     ],
   },
 
@@ -82,11 +77,6 @@ const routes: RouteRecordRaw[] = [
         path: '/video/:uuid?',
         name: 'video',
         component: () => import('@/views/luma/video.vue'),
-      },
-      {
-        path: '/video/create-miracles',
-        name: 'createMiraclesVideo',
-        component: () => import('@/views/luma/createMiraclesVideo.vue'),
       },
     ],
   },

@@ -17,7 +17,8 @@ export type LumaMedia = {
     video?: LumaVideo;
     liked?: boolean | null;
     estimate_wait_seconds?: number | null;
-    last_feed?:number
+    last_feed?: number;
+    progress?: number; // 进度百分比 0-100
 };
 export class lumaStore{
   //private id: string;

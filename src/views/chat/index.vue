@@ -449,9 +449,9 @@ const ychat = computed(() => {
 
     <main class="flex-1 overflow-hidden">
 
-      <div id="scrollRef" ref="scrollRef" class="h-full overflow-hidden overflow-y-auto">
+        <div id="scrollRef" ref="scrollRef" class="h-full overflow-hidden overflow-y-auto">
 
-        <div id="image-wrapper" class="w-full max-w-[1100px] m-auto dark:bg-[#101014]"
+        <div id="image-wrapper" class="w-full max-w-[1100px] m-auto dark:bg-transparent bg-transparent"
           :class="[isMobile ? 'p-2' : 'p-4']">
           <template v-if="!displayMessages.length">
             <div v-if="homeStore.myData.session.notify" v-html="homeStore.myData.session.notify"
@@ -464,7 +464,7 @@ const ychat = computed(() => {
 
               <br>
               <div v-if="local !== 'draw'">
-                <div class="help">
+                <div class="help card-hover">
                   <div class="ai-icon">
                     <IconSvg icon="chatGPT" :width="isMobile ? '32px' : '64px'" :height="isMobile ? '32px' : '64px'">
                     </IconSvg>
