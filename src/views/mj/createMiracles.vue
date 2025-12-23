@@ -313,6 +313,22 @@ const generateImage = async () => {
   }
 
   loading.value = true
+  
+  // 立即创建一个临时占位卡片，让用户立即看到
+  const tempId = `temp-${Date.now()}`
+  const tempImage: any = {
+    id: tempId,
+    mjID: tempId,
+    url: '',
+    prompt: prompt.value,
+    createdAt: new Date().toISOString(),
+    taskId: tempId,
+    loading: true,
+    image_url: '',
+    time: Date.now(),
+  }
+  generatedImages.value.unshift(tempImage)
+  
   try {
     // 构建提示词，包含宽高比和风格信息
     let fullPrompt = prompt.value
@@ -357,21 +373,38 @@ const generateImage = async () => {
         }
 
         if (imageUrl) {
-          // 如果直接返回了图片URL，立即显示
+          // 如果直接返回了图片URL，更新临时卡片
           const imageId = `gemini-${Date.now()}`
-          const newImage: any = {
-            id: imageId,
-            mjID: imageId,
-            url: imageUrl, // 直接使用返回的URL
-            prompt: prompt.value,
-            createdAt: new Date().toISOString(),
-            taskId: imageId,
-            loading: false,
-            image_url: imageUrl,
-            time: Date.now(),
-            status: 'SUCCESS',
+          const tempIndex = generatedImages.value.findIndex(img => img.id === tempId)
+          if (tempIndex !== -1) {
+            // 更新临时卡片
+            generatedImages.value[tempIndex] = {
+              id: imageId,
+              mjID: imageId,
+              url: imageUrl, // 直接使用返回的URL
+              prompt: prompt.value,
+              createdAt: new Date().toISOString(),
+              taskId: imageId,
+              loading: false,
+              image_url: imageUrl,
+              time: Date.now(),
+              status: 'SUCCESS',
+            }
+          } else {
+            // 如果找不到临时卡片，创建新卡片
+            generatedImages.value.unshift({
+              id: imageId,
+              mjID: imageId,
+              url: imageUrl,
+              prompt: prompt.value,
+              createdAt: new Date().toISOString(),
+              taskId: imageId,
+              loading: false,
+              image_url: imageUrl,
+              time: Date.now(),
+              status: 'SUCCESS',
+            })
           }
-          generatedImages.value.unshift(newImage)
           
           // 保存到存储
           mjS.save({
@@ -415,27 +448,53 @@ const generateImage = async () => {
             mlog('图片缓存失败', error)
           })
         } else {
+          // 如果没有找到图片URL，移除临时卡片
+          const tempIndex = generatedImages.value.findIndex(img => img.id === tempId)
+          if (tempIndex !== -1) {
+            generatedImages.value.splice(tempIndex, 1)
+          }
           message.warning('未找到图片URL')
         }
       } catch (parseError) {
         mlog('解析响应数据失败:', parseError)
         message.error('解析响应数据失败')
+        // 移除临时卡片
+        const tempIndex = generatedImages.value.findIndex(img => img.id === tempId)
+        if (tempIndex !== -1) {
+          generatedImages.value.splice(tempIndex, 1)
+        }
       }
     } else if (response && response.result) {
       // 处理 Midjourney 格式（返回 taskId，需要等待）
       const taskId = response.result
-      const newImage: any = {
-        id: taskId,
-        mjID: taskId,
-        url: '', // 等待生成完成后更新
-        prompt: prompt.value,
-        createdAt: new Date().toISOString(),
-        taskId: taskId,
-        loading: true,
-        image_url: '',
-        time: Date.now(),
+      const tempIndex = generatedImages.value.findIndex(img => img.id === tempId)
+      if (tempIndex !== -1) {
+        // 更新临时卡片为真实的taskId
+        generatedImages.value[tempIndex] = {
+          id: taskId,
+          mjID: taskId,
+          url: '', // 等待生成完成后更新
+          prompt: prompt.value,
+          createdAt: new Date().toISOString(),
+          taskId: taskId,
+          loading: true,
+          image_url: '',
+          time: Date.now(),
+        }
+      } else {
+        // 如果找不到临时卡片，创建新卡片
+        generatedImages.value.unshift({
+          id: taskId,
+          mjID: taskId,
+          url: '',
+          prompt: prompt.value,
+          createdAt: new Date().toISOString(),
+          taskId: taskId,
+          loading: true,
+          image_url: '',
+          time: Date.now(),
+        })
       }
-      generatedImages.value.unshift(newImage)
       
       // 保存到存储（即使还在生成中）
       mjS.save({
@@ -463,15 +522,31 @@ const generateImage = async () => {
     } else if (response?.code === 21) {
       // 需要模态确认
       message.info('请确认生成参数')
+      // 移除临时卡片
+      const tempIndex = generatedImages.value.findIndex(img => img.id === tempId)
+      if (tempIndex !== -1) {
+        generatedImages.value.splice(tempIndex, 1)
+      }
     } else {
       mlog('未知的响应格式:', response)
       message.warning('未知的响应格式，请查看控制台')
+      // 移除临时卡片
+      const tempIndex = generatedImages.value.findIndex(img => img.id === tempId)
+      if (tempIndex !== -1) {
+        generatedImages.value.splice(tempIndex, 1)
+      }
     }
   } catch (error: any) {
     mlog('generateImage error:', error)
     message.error(error?.error || error?.message || '图片生成失败')
+    // 发生错误时，移除临时卡片
+    const tempIndex = generatedImages.value.findIndex(img => img.id === tempId)
+    if (tempIndex !== -1) {
+      generatedImages.value.splice(tempIndex, 1)
+    }
   } finally {
     loading.value = false
+    // 注意：生成成功后不清空提示词，保留描述信息供用户继续使用
   }
 }
 
@@ -744,13 +819,12 @@ onMounted(() => {
               type="primary"
               size="large"
               class="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-lg"
-              :loading="loading"
               @click="generateImage"
             >
               <template #icon>
                 <SvgIcon icon="mdi:auto-fix" />
               </template>
-              {{ loading ? '生成中...' : '生成图像' }}
+              生成图像
             </NButton>
             <NButton
               size="large"
@@ -794,30 +868,31 @@ onMounted(() => {
               v-for="image in generatedImages"
               :key="image.id"
             >
-              <NCard class="image-card cursor-pointer hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800">
-                <div @click="viewImage(image.url)" class="relative group">
-                  <div v-if="image.loading" class="absolute inset-0 bg-gray-900/50 flex items-center justify-center z-10 rounded-lg">
-                    <NSpin size="large" />
-                  </div>
-                  <img
-                    v-if="image.url && !image.loading"
-                    :src="image.url"
-                    class="w-full h-auto rounded-t-lg transition-transform duration-300 group-hover:scale-105"
-                    :alt="image.prompt"
-                    @error="() => { image.url = image.image_url || image.src || ''; image.loading = false; }"
-                  />
-                  <div v-else class="w-full aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-t-lg flex items-center justify-center">
-                    <div class="text-center">
+              <NCard class="image-card hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800" :class="{ 'cursor-pointer': image.url && !image.loading }">
+                <div @click="image.url && !image.loading ? viewImage(image.url) : null" class="relative group">
+                  <!-- 图像容器：始终存在的方框 -->
+                  <div class="w-full aspect-square border-2 border-gray-300 dark:border-gray-600 rounded-t-lg overflow-hidden bg-white dark:bg-gray-800 flex items-center justify-center relative">
+                    <!-- 如果图像已加载，显示图像 -->
+                    <img
+                      v-if="image.url && !image.loading"
+                      :src="image.url"
+                      class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      :alt="image.prompt"
+                      @error="() => { image.url = image.image_url || image.src || ''; image.loading = false; }"
+                    />
+                    <!-- 如果正在加载或没有图像，显示加载动画 -->
+                    <div v-else class="w-full h-full flex flex-col items-center justify-center">
                       <NSpin size="large" />
-                      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400" v-if="image.progress">
+                      <p class="mt-4 text-sm text-gray-500 dark:text-gray-400" v-if="image.progress">
                         {{ image.progress }}
                       </p>
-                      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400" v-else>
+                      <p class="mt-4 text-sm text-gray-500 dark:text-gray-400" v-else>
                         生成中...
                       </p>
                     </div>
                   </div>
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-end justify-center pb-4">
+                  <!-- 悬停时的查看图标遮罩（仅在图像加载完成时显示） -->
+                  <div v-if="image.url && !image.loading" class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-end justify-center pb-4 pointer-events-none">
                     <SvgIcon icon="mdi:eye" class="text-white text-2xl" />
                   </div>
                 </div>

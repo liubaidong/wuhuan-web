@@ -1,5 +1,5 @@
 <script setup lang="ts">
-	import { ref, computed, onMounted, watch } from 'vue'
+	import { ref, computed, onMounted, watch, nextTick } from 'vue'
 	import { NButton, NCard, NInput, NSelect, NImage, NGrid, NGridItem, useMessage, NModal, NSpin, NProgress } from 'naive-ui'
 	import { SvgIcon } from '@/components/common'
 	import { useBasicLayout } from '@/hooks/useBasicLayout'
@@ -24,6 +24,7 @@
 	const showVideoModal = ref(false)
 	const selectedVideo = ref('')
 	const processingTasks = ref<Set<string>>(new Set())
+	const playingVideos = ref<string[]>([]) // 记录正在播放的视频ID
 
 	// 宽高比选项
 	const aspectRatios = [
@@ -81,12 +82,12 @@
 					message.success('视频生成任务已提交，请稍候...')
 					processingTasks.value.add(taskId)
 
-					// 开始轮询任务状态
-					FeedLumaTask(taskId)
+				// 开始轮询任务状态
+				FeedLumaTask(taskId)
 
-					// 清空输入
-					prompt.value = ''
-					uploadedImage.value = ''
+				// 清空输入（保留提示词描述信息）
+				// prompt.value = ''
+				uploadedImage.value = ''
 				}
 			}
 		} catch (error: any) {
@@ -97,10 +98,20 @@
 		}
 	}
 
-	// 查看视频
-	const viewVideo = (videoUrl: string) => {
-		selectedVideo.value = videoUrl
-		showVideoModal.value = true
+	// 查看视频 - 在原位置播放
+	const viewVideo = (videoId: string) => {
+		if (playingVideos.value.includes(videoId)) {
+			// 如果正在播放，则停止播放
+			playingVideos.value = playingVideos.value.filter(id => id !== videoId)
+		} else {
+			// 停止其他所有正在播放的视频
+			playingVideos.value = [videoId]
+		}
+	}
+
+	// 停止播放视频
+	const stopPlaying = (videoId: string) => {
+		playingVideos.value = playingVideos.value.filter(id => id !== videoId)
 	}
 
 	// 删除上传的图片
@@ -188,6 +199,30 @@
 	)
 
 	// 组件挂载时加载视频
+	// 监听播放状态变化，自动播放/暂停视频
+	watch(playingVideos, async (newList, oldList) => {
+		await nextTick()
+		// 找出新增的视频ID（开始播放的）
+		newList.forEach((videoId) => {
+			if (!oldList?.includes(videoId)) {
+				const videoElement = document.querySelector(`[data-video-id="${videoId}"]`) as HTMLVideoElement
+				if (videoElement) {
+					videoElement.play().catch(() => {})
+				}
+			}
+		})
+		// 找出移除的视频ID（停止播放的）
+		oldList?.forEach((videoId) => {
+			if (!newList.includes(videoId)) {
+				const videoElement = document.querySelector(`[data-video-id="${videoId}"]`) as HTMLVideoElement
+				if (videoElement) {
+					videoElement.pause()
+					videoElement.currentTime = 0
+				}
+			}
+		})
+	}, { deep: true })
+
 	onMounted(() => {
 		loadGeneratedVideos()
 	})
@@ -405,28 +440,40 @@
 									<div
 										@click="() => {
 											const url = video.video?.download_url || video.video?.url;
-											if (url) viewVideo(url);
+											if (url) viewVideo(video.id);
 										}"
-										class="relative cursor-pointer"
+										class="relative"
+										:class="{ 'cursor-pointer': !playingVideos.includes(video.id) }"
 									>
 										<!-- 视频播放器 -->
-										<div class="relative aspect-[16/9] bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-t-lg overflow-hidden">
+										<div class="relative aspect-[16/9] bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-t-lg overflow-hidden bg-black">
 											<video
 												v-if="video.video?.download_url || video.video?.url"
+												:data-video-id="video.id"
 												:src="video.video?.download_url || video.video?.url"
-												class="w-full h-full object-cover"
-												loop
-												muted
+												class="w-full h-full object-contain"
+												:controls="playingVideos.includes(video.id)"
+												:loop="!playingVideos.includes(video.id)"
+												:muted="!playingVideos.includes(video.id)"
 												playsinline
 												preload="metadata"
 												@mouseenter="(e) => {
-													const videoEl = e.target as HTMLVideoElement;
-													videoEl.play().catch(() => {});
+													if (!playingVideos.includes(video.id)) {
+														const videoEl = e.target as HTMLVideoElement;
+														videoEl.play().catch(() => {});
+													}
 												}"
 												@mouseleave="(e) => {
-													const videoEl = e.target as HTMLVideoElement;
-													videoEl.pause();
-													videoEl.currentTime = 0;
+													if (!playingVideos.includes(video.id)) {
+														const videoEl = e.target as HTMLVideoElement;
+														videoEl.pause();
+														videoEl.currentTime = 0;
+													}
+												}"
+												@ended="() => {
+													if (playingVideos.includes(video.id)) {
+														stopPlaying(video.id);
+													}
 												}"
 											/>
 											<div v-else class="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
@@ -460,15 +507,25 @@
 												</p>
 											</div>
 
-											<!-- 播放按钮覆盖层 -->
+											<!-- 播放按钮覆盖层（仅在非播放状态且hover时显示） -->
 											<div
-												v-if="video.video?.download_url || video.video?.url"
-												class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+												v-if="(video.video?.download_url || video.video?.url) && !playingVideos.includes(video.id)"
+												class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none"
 											>
 												<div class="bg-white/20 backdrop-blur-sm rounded-full p-4">
 													<SvgIcon icon="mdi:play-circle" class="text-white text-5xl" />
 												</div>
 											</div>
+
+											<!-- 关闭播放按钮（在播放状态时显示） -->
+											<button
+												v-if="playingVideos.includes(video.id)"
+												@click.stop="stopPlaying(video.id)"
+												class="absolute top-2 left-2 z-20 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 transition-all duration-200 shadow-lg flex items-center justify-center"
+												title="关闭播放"
+											>
+												<SvgIcon icon="mdi:close" class="text-xl" />
+											</button>
 										</div>
 									</div>
 									<div class="p-4">
@@ -505,13 +562,7 @@
 												size="small"
 												quaternary
 												class="flex-1"
-												@click.stop="() => {
-													const url = video.video?.download_url || video.video?.url || '';
-													if (url) {
-														navigator.clipboard.writeText(url);
-														message.success('链接已复制到剪贴板');
-													}
-												}"
+												disabled
 											>
 												<template #icon>
 													<SvgIcon icon="mdi:share" />
