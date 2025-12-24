@@ -1,5 +1,5 @@
 import { ss } from '@/utils/storage'
- 
+
  type LumaVideo = {
     url: string;
     width: number;
@@ -8,7 +8,7 @@ import { ss } from '@/utils/storage'
     download_url?: string;
 };
 
- 
+
 export type LumaMedia = {
     id: string;
     prompt: string;
@@ -19,6 +19,7 @@ export type LumaMedia = {
     estimate_wait_seconds?: number | null;
     last_feed?: number;
     progress?: number; // 进度百分比 0-100
+    model?: string; // 模型值
 };
 export class lumaStore{
   //private id: string;
@@ -31,8 +32,8 @@ export class lumaStore{
     else arr.push(obj);
      ss.set(this.localKey, arr );
     return this;
-  } 
-  public findIndex(id:string){ 
+  }
+  public findIndex(id:string){
     return this.getObjs().findIndex( v=>v.id== id )
   }
 

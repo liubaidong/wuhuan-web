@@ -35,3 +35,13 @@ export function imageModelList() {
 		method: "get",
 	});
 }
+/**
+ * 查询视频模型列表
+ * @returns
+ */
+export function videoModelList() {
+	return request({
+		url: "/system/model/videoModelList",
+		method: "get",
+	});
+}

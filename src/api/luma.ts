@@ -86,18 +86,32 @@ export const lumaFetch=(url:string,data?:any,opt2?:any )=>{
 
 }
 
-export const FeedLumaTask= async(id:string)=>{
+export const FeedLumaTask= async(id:string, model?:string)=>{
     if(id=='')return '';
     const lumaS = new lumaStore();
+    // 尝试从已保存的数据中获取模型值
+    let savedModel = model;
+    if (!savedModel) {
+        const savedData = lumaS.getObjs().find(v => v.id === id);
+        if (savedData?.model) {
+            savedModel = savedData.model;
+        }
+    }
+
     for(let i=0; i<120;i++){
-        let response:any = await lumaFetch('/generations/'+id );
+        // 构建URL，如果有model值则作为查询参数传递
+        let url = '/generations/' + id;
+        if (savedModel) {
+            url += '?model=' + encodeURIComponent(savedModel);
+        }
+        let response:any = await lumaFetch(url);
         if(!response || !response.id) {
             await sleep(5*1000);
             continue;
         }
-        
+
         mlog('FeedLumaTask response:', response);
-        
+
         // 转换后端返回格式为 LumaMedia 格式
         let d:LumaMedia = {
             id: response.id,
@@ -106,8 +120,9 @@ export const FeedLumaTask= async(id:string)=>{
             created_at: response.created_at ? (typeof response.created_at === 'number' ? new Date(response.created_at).toISOString() : response.created_at) : undefined,
             last_feed: new Date().getTime(),
             progress: response.progress !== undefined ? Number(response.progress) : undefined, // 保存进度百分比
+            model: savedModel, // 保存模型值
         };
-        
+
         // 如果 progress 为 100 或 status 为 completed，且有 video_url，则设置 video
         if ((response.progress === 100 || response.status === 'completed') && response.video_url) {
             d.state = 'completed';
@@ -134,14 +149,25 @@ export const FeedLumaTask= async(id:string)=>{
             };
             mlog('FeedLumaTask: Video URL set (fallback):', d.video.download_url);
         }
-        
+
+        // 确保保留已保存的model值（如果本次更新没有model值，从已保存的数据中获取）
+        if (!d.model && savedModel) {
+            d.model = savedModel;
+        } else if (!d.model) {
+            const existingData = lumaS.getObjs().find(v => v.id === id);
+            if (existingData?.model) {
+                d.model = existingData.model;
+            }
+        }
+
             lumaS.save(d);
             homeStore.setMyData({act:'FeedLumaTask'});
-        
+
         // 如果已完成且有视频链接，停止轮询
+        // 注意：model值已经在每次查询时通过查询参数传递到后端了
         if( d.state=='completed' && d.video && (d.video?.download_url || d.video?.url) ){
-            mlog('FeedLumaTask: Task completed, stopping polling');
-                break;
+            mlog('FeedLumaTask: Task completed, stopping polling. Model was sent via query parameter:', savedModel);
+            break;
         }
         await sleep(5*1000);
     }

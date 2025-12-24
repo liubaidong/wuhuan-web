@@ -31,18 +31,18 @@ const selectedImage = ref('')
 const loadGeneratedImages = async () => {
   try {
     mlog('开始加载图片列表...')
-    
+
     // 首先从本地存储加载历史图片
     const storedImages = mjS.getObjs()
     mlog('从存储加载的图片:', storedImages.length)
-    
+
     // 同时从聊天记录加载（作为补充）
     const d = await getMjAll(chatStore.$state)
     mlog('getMjAll 返回数据:', d?.length, d)
-    
+
     // 合并存储的图片和聊天记录中的图片
     const allImagesMap = new Map<string, any>()
-    
+
     // 先添加存储的图片
     storedImages.forEach((img: MjImage) => {
       if (img.id) {
@@ -52,7 +52,7 @@ const loadGeneratedImages = async () => {
         })
       }
     })
-    
+
     // 再添加聊天记录中的图片（如果不存在或需要更新）
     if (d && d.length > 0) {
       const rz = d.filter((v: any) => v.mjID && v.opt).map((v: any) => {
@@ -89,12 +89,12 @@ const loadGeneratedImages = async () => {
     const images: any[] = []
     for (const [id, v] of allImagesMap) {
       if (!v || (!v.mjID && !v.id)) continue
-      
+
       const mjId = v.mjID || v.id || id
       if (!mjId) continue
-      
+
       const key = 'img:' + mjId
-      
+
       try {
         // 如果有图片 URL
         if (v.image_url || v.url) {
@@ -165,7 +165,7 @@ const loadGeneratedImages = async () => {
 
     // 按时间排序，最新的在前
     generatedImages.value = images.sort((a: any, b: any) => (b.time || 0) - (a.time || 0))
-    
+
     // 保存所有图片到存储（确保持久化）
     generatedImages.value.forEach((img: any) => {
       if (img.id) {
@@ -188,7 +188,7 @@ const loadGeneratedImages = async () => {
         }
       }
     })
-    
+
     mlog('图片列表加载完成，共', generatedImages.value.length, '张图片')
     mlog('图片列表详情:', generatedImages.value.map(img => ({ mjID: img.mjID, url: img.url ? '有URL' : '无URL', loading: img.loading })))
   } catch (error) {
@@ -207,7 +207,7 @@ watch(
       const actData: any = homeStore.myData.actData
       if (actData && actData.mjID) {
         mlog('检测到图片更新', actData.mjID, actData.opt?.imageUrl, actData.opt?.progress)
-        
+
         // 如果有图片URL，立即保存到存储
         if (actData.opt?.imageUrl) {
           const imageId = actData.mjID
@@ -229,7 +229,7 @@ watch(
             mlog('保存图片到存储失败', e)
           }
         }
-        
+
         // 延迟加载，确保数据已更新
         setTimeout(() => {
           loadGeneratedImages()
@@ -270,8 +270,8 @@ const aspectRatios = [
   { label: '1:1', value: '1:1', icon: 'square' },
   { label: '4:3', value: '4:3', icon: 'landscape' },
   { label: '3:4', value: '3:4', icon: 'portrait' },
-  { label: '16:9', value: '16:9', icon: 'wide' },
-  { label: '9:16', value: '9:16', icon: 'tall' },
+  { label: '横屏', value: '1280x720', icon: 'wide' },
+  { label: '竖屏', value: '720x1280', icon: 'tall' },
 ]
 
 // 风格选项
@@ -313,7 +313,7 @@ const generateImage = async () => {
   }
 
   loading.value = true
-  
+
   // 立即创建一个临时占位卡片，让用户立即看到
   const tempId = `temp-${Date.now()}`
   const tempImage: any = {
@@ -328,7 +328,7 @@ const generateImage = async () => {
     time: Date.now(),
   }
   generatedImages.value.unshift(tempImage)
-  
+
   try {
     // 构建提示词，包含宽高比和风格信息
     let fullPrompt = prompt.value
@@ -359,7 +359,7 @@ const generateImage = async () => {
       try {
         // 解析 msg 字段中的 JSON 字符串
         const msgData = typeof response.msg === 'string' ? JSON.parse(response.msg) : response.msg
-        
+
         // 提取图片 URL（Gemini 格式：candidates[0].content.parts[0].inlineData.data）
         let imageUrl = ''
         if (msgData.candidates && msgData.candidates.length > 0) {
@@ -405,7 +405,7 @@ const generateImage = async () => {
               status: 'SUCCESS',
             })
           }
-          
+
           // 保存到存储
           mjS.save({
             id: imageId,
@@ -419,9 +419,9 @@ const generateImage = async () => {
             status: 'SUCCESS',
             time: Date.now(),
           })
-          
+
           message.success('图片生成成功！')
-          
+
           // 异步缓存图片
           const key = 'img:' + imageId
           url2base64(imageUrl, key).then((result: any) => {
@@ -495,7 +495,7 @@ const generateImage = async () => {
           time: Date.now(),
         })
       }
-      
+
       // 保存到存储（即使还在生成中）
       mjS.save({
         id: taskId,
@@ -508,7 +508,7 @@ const generateImage = async () => {
         loading: true,
         time: Date.now(),
       })
-      
+
       message.success('图片生成任务已提交，请稍候...')
 
       // 使用现有的任务处理机制

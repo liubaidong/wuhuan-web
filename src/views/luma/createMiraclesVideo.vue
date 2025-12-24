@@ -8,6 +8,7 @@
 	import { homeStore } from '@/store'
 	import { lumaStore, LumaMedia } from '@/api/lumaStore'
 	import { ss } from '@/utils/storage'
+	import { videoModelList } from '@/api/model'
 
 	const { isMobile } = useBasicLayout()
 	const message = useMessage()
@@ -19,6 +20,8 @@
 	const selectedAspectRatio = ref('16:9')
 	const selectedDuration = ref('5')
 	const expandPrompt = ref(true)
+	const selectedModel = ref('') // 模型选择
+	const modelOptions = ref<any[]>([])
 	const uploadedImage = ref('')
 	const generatedVideos = ref<LumaMedia[]>([])
 	const showVideoModal = ref(false)
@@ -28,10 +31,9 @@
 
 	// 宽高比选项
 	const aspectRatios = [
-		{ label: '16:9', value: '16:9', icon: 'mdi:monitor' },
-		{ label: '9:16', value: '9:16', icon: 'mdi:cellphone' },
-		{ label: '1:1', value: '1:1', icon: 'mdi:square' },
-		{ label: '4:5', value: '4:5', icon: 'mdi:tablet' },
+
+		{ label: '横屏', value: '1280x720', icon: 'mdi:monitor' },
+		{ label: '竖屏', value: '720x1280', icon: 'mdi:cellphone' },
 	]
 
 	// 时长选项
@@ -39,7 +41,7 @@
 		{ label: '5秒', value: '5' },
 		{ label: '10秒', value: '10' },
 		{ label: '15秒', value: '15' },
-		{ label: '30秒', value: '30' },
+
 	]
 
 	// 图片上传处理
@@ -71,6 +73,8 @@
 				aspect_ratio: selectedAspectRatio.value,
 				expand_prompt: expandPrompt.value,
 				image_url: uploadedImage.value || '',
+				model: selectedModel.value || '', // 将选中的模型传到后台
+				duration: selectedDuration.value || '5', // 将视频时长传到后台
 			}
 
 			// 调用后端API
@@ -82,12 +86,22 @@
 					message.success('视频生成任务已提交，请稍候...')
 					processingTasks.value.add(taskId)
 
-				// 开始轮询任务状态
-				FeedLumaTask(taskId)
+					// 保存初始任务信息，包括模型值
+					const initialVideo: LumaMedia = {
+						id: taskId,
+						prompt: prompt.value,
+						state: 'pending',
+						model: selectedModel.value || '',
+						created_at: new Date().toISOString(),
+					}
+					lumaS.save(initialVideo)
 
-				// 清空输入（保留提示词描述信息）
-				// prompt.value = ''
-				uploadedImage.value = ''
+					// 开始轮询任务状态
+					FeedLumaTask(taskId, selectedModel.value || '')
+
+					// 清空输入（保留提示词描述信息）
+					// prompt.value = ''
+					uploadedImage.value = ''
 				}
 			}
 		} catch (error: any) {
@@ -223,8 +237,43 @@
 		})
 	}, { deep: true })
 
+	// 获取视频模型列表
+	const fetchModelList = async () => {
+		try {
+			const result = await videoModelList()
+			mlog('Video model list API response:', result)
+			if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
+				// 先映射数据
+				const mappedOptions = result.data.map((model: any) => ({
+					label: model.modelDescribe || model.modelName || '',
+					value: model.modelName || '',
+				}))
+
+				// 基于value去重，保留第一个出现的项
+				const uniqueMap = new Map<string, { label: string; value: string }>()
+				mappedOptions.forEach((item: any) => {
+					if (item.value && !uniqueMap.has(item.value)) {
+						uniqueMap.set(item.value, item)
+					}
+				})
+
+				modelOptions.value = Array.from(uniqueMap.values())
+				mlog('Video model list loaded (after deduplication):', modelOptions.value)
+			} else {
+				mlog('Video model list is empty or invalid:', result)
+				// 如果没有数据，设置空数组
+				modelOptions.value = []
+			}
+		} catch (error) {
+			mlog('Failed to load video model list:', error)
+			message.error('获取视频模型列表失败')
+			modelOptions.value = []
+		}
+	}
+
 	onMounted(() => {
 		loadGeneratedVideos()
+		fetchModelList()
 	})
 	</script>
 
@@ -326,6 +375,25 @@
 							>
 								{{ expandPrompt ? '开启' : '关闭' }}
 							</NButton>
+						</div>
+
+						<!-- 模型选择 -->
+						<div>
+							<label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+								<SvgIcon icon="mdi:robot" class="text-blue-500" />
+								模型
+							</label>
+							<NSelect
+								v-model:value="selectedModel"
+								:options="modelOptions"
+								placeholder="选择模型（可选）"
+								clearable
+								:filterable="false"
+								@update:value="(value) => {
+									selectedModel = value || ''
+									mlog('Model selected:', value)
+								}"
+							/>
 						</div>
 
 						<!-- 参考图片上传 -->
